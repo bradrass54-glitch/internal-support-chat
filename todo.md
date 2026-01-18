@@ -61,3 +61,10 @@
 
 ## Bug Fixes
 - [x] Fix sign-in routing - currently redirects to 404 instead of chat interface
+
+## Feature Requests
+- [x] Consolidate to single unified chat interface (remove department selection)
+- [x] Integrate real LLM service (OpenAI/Claude) for AI responses
+- [ ] Add streaming support for real-time AI message generation
+- [x] Implement department context detection from user messages
+- [x] Add AI response generation with documentation context

@@ -1,10 +1,11 @@
 import { getDb } from "../db";
 import { documentationSources, messages, conversations } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { invokeLLM } from "../_core/llm";
 
 /**
  * AI Service - generates contextual responses based on documentation and conversation history
- * Uses LLM integration from the core framework
+ * Uses the framework's LLM integration (Gemini 2.5 Flash by default)
  */
 
 /**
@@ -14,25 +15,42 @@ import { eq, and } from "drizzle-orm";
 export async function generateAIResponse(
   conversationId: number,
   userMessage: string,
-  departmentId: number
+  departmentId?: number
 ): Promise<string> {
   try {
-    // Get relevant documentation for the department
-    const docs = await getDepartmentContext(departmentId);
+    // Get relevant documentation for the department (if provided)
+    const docs = departmentId ? await getDepartmentContext(departmentId) : await getAllDocumentation();
 
     // Get recent conversation history for context
-    const history = await getConversationContext(conversationId, 5);
+    const history = await getConversationContext(conversationId, 10);
 
-    // Build context for AI
-    const context = buildContext(docs, history, userMessage);
+    // Build system prompt for AI
+    const systemPrompt = buildSystemPrompt(docs);
 
-    // Generate response using LLM
-    const response = await callLLM(context, userMessage);
+    // Build message history for the LLM
+    const messageHistory = buildMessageHistory(history, userMessage);
 
-    return response;
+    // Call the LLM with proper context
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        ...messageHistory,
+      ],
+    });
+
+    // Extract the response text
+    const responseText = response.choices[0]?.message?.content;
+    if (typeof responseText === "string") {
+      return responseText;
+    }
+
+    return generateFallbackResponse(userMessage);
   } catch (error) {
     console.error("[AI] Failed to generate response:", error);
-    return "I apologize, but I'm unable to generate a response at this moment. Please try again or escalate to a live agent.";
+    return generateFallbackResponse(userMessage);
   }
 }
 
@@ -60,11 +78,34 @@ async function getDepartmentContext(departmentId: number): Promise<string> {
 }
 
 /**
- * Get recent conversation history for context
+ * Get all active documentation
  */
-async function getConversationContext(conversationId: number, limit: number = 5): Promise<string> {
+async function getAllDocumentation(): Promise<string> {
   const db = await getDb();
   if (!db) return "";
+
+  try {
+    const docs = await db
+      .select({ title: documentationSources.title, content: documentationSources.content, departmentId: documentationSources.departmentId })
+      .from(documentationSources)
+      .where(eq(documentationSources.isActive, true))
+      .limit(20);
+
+    return docs
+      .map((doc) => `**${doc.title}**\n${doc.content}`)
+      .join("\n\n---\n\n");
+  } catch (error) {
+    console.error("[AI] Failed to get all documentation:", error);
+    return "";
+  }
+}
+
+/**
+ * Get recent conversation history for context
+ */
+async function getConversationContext(conversationId: number, limit: number = 10): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+  const db = await getDb();
+  if (!db) return [];
 
   try {
     const msgs = await db
@@ -74,75 +115,52 @@ async function getConversationContext(conversationId: number, limit: number = 5)
       .orderBy(messages.createdAt)
       .limit(limit);
 
-    return msgs
-      .map((msg) => `[${msg.senderType.toUpperCase()}]: ${msg.content}`)
-      .join("\n");
+    return msgs.map((msg) => ({
+      role: msg.senderType === "user" ? ("user" as const) : ("assistant" as const),
+      content: msg.content,
+    }));
   } catch (error) {
     console.error("[AI] Failed to get conversation context:", error);
-    return "";
+    return [];
   }
 }
 
 /**
- * Build context prompt for LLM
+ * Build system prompt for the LLM
  */
-function buildContext(documentation: string, history: string, userMessage: string): string {
-  return `You are a helpful internal support agent for an organization. You have access to the following documentation and conversation history to help answer user questions.
+function buildSystemPrompt(documentation: string): string {
+  return `You are a helpful internal support agent for an organization. You have access to the following documentation to help answer user questions.
+
+Your responsibilities:
+1. Answer questions based on the provided documentation
+2. Be concise and helpful
+3. If you don't have information to answer a question, suggest escalating to a live agent
+4. Maintain a professional and friendly tone
+5. Provide step-by-step guidance when needed
 
 ## Available Documentation:
-${documentation || "No documentation available for this department."}
+${documentation || "No documentation available at this time."}
 
-## Conversation History:
-${history || "No previous messages in this conversation."}
-
-## Current User Question:
-${userMessage}
-
-Please provide a helpful, concise response based on the available documentation. If you don't have information to answer the question, suggest escalating to a live agent.`;
+Please provide helpful, accurate responses based on the documentation above.`;
 }
 
 /**
- * Call the LLM API to generate a response
- * This integrates with the framework's LLM capabilities
+ * Build message history for LLM
  */
-async function callLLM(context: string, userMessage: string): Promise<string> {
-  try {
-    // This would integrate with your LLM provider (OpenAI, Claude, etc.)
-    // For now, return a placeholder that indicates the system is ready for integration
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY || ""}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: context,
-          },
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
+function buildMessageHistory(
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  currentMessage: string
+): Array<{ role: "user" | "assistant"; content: string }> {
+  // Include recent history (up to 5 previous exchanges)
+  const recentHistory = history.slice(-10);
 
-    if (!response.ok) {
-      console.warn("[AI] LLM API error:", response.statusText);
-      return generateFallbackResponse(userMessage);
-    }
-
-    const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
-    return data.choices[0]?.message?.content || generateFallbackResponse(userMessage);
-  } catch (error) {
-    console.warn("[AI] Failed to call LLM:", error);
-    return generateFallbackResponse(userMessage);
-  }
+  return [
+    ...recentHistory,
+    {
+      role: "user",
+      content: currentMessage,
+    },
+  ];
 }
 
 /**
@@ -162,6 +180,10 @@ function generateFallbackResponse(userMessage: string): string {
 
   if (lowerMessage.includes("expense") || lowerMessage.includes("reimbursement")) {
     return "For expense reimbursement, please submit your receipts through the Finance portal. Reimbursements typically process within 5-7 business days.";
+  }
+
+  if (lowerMessage.includes("vacation") || lowerMessage.includes("time off")) {
+    return "To request time off, please log into the HR portal and submit a time off request. Your manager will need to approve it.";
   }
 
   // Default response
@@ -284,4 +306,52 @@ export async function generateConversationSummary(conversationId: number): Promi
     console.error("[AI] Failed to generate summary:", error);
     return "";
   }
+}
+
+/**
+ * Detect which department a message relates to
+ */
+export async function detectDepartment(userMessage: string): Promise<string | null> {
+  const lowerMessage = userMessage.toLowerCase();
+
+  // IT keywords
+  if (
+    lowerMessage.includes("password") ||
+    lowerMessage.includes("vpn") ||
+    lowerMessage.includes("software") ||
+    lowerMessage.includes("computer") ||
+    lowerMessage.includes("network") ||
+    lowerMessage.includes("email") ||
+    lowerMessage.includes("access")
+  ) {
+    return "IT";
+  }
+
+  // HR keywords
+  if (
+    lowerMessage.includes("vacation") ||
+    lowerMessage.includes("time off") ||
+    lowerMessage.includes("benefits") ||
+    lowerMessage.includes("policy") ||
+    lowerMessage.includes("hr") ||
+    lowerMessage.includes("leave") ||
+    lowerMessage.includes("enrollment")
+  ) {
+    return "HR";
+  }
+
+  // Finance keywords
+  if (
+    lowerMessage.includes("expense") ||
+    lowerMessage.includes("reimbursement") ||
+    lowerMessage.includes("purchase order") ||
+    lowerMessage.includes("invoice") ||
+    lowerMessage.includes("payroll") ||
+    lowerMessage.includes("finance") ||
+    lowerMessage.includes("budget")
+  ) {
+    return "Finance";
+  }
+
+  return null;
 }
