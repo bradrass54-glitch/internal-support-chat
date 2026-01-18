@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "../utils/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Send, Clock, LogOut, Menu, X } from "lucide-react";
-import { trpc } from "@/lib/trpc";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Send, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 
 interface Message {
   id: number;
@@ -23,15 +21,13 @@ interface Alert {
   severity: "low" | "medium" | "high" | "critical";
 }
 
-export default function Home() {
-  const { user, loading, isAuthenticated, logout } = useAuth();
+export function ChatPage() {
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TRPC hooks
@@ -71,40 +67,15 @@ export default function Home() {
     }
   }, [getAlertsQuery.data]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Internal Support Chat</h1>
-          <p className="text-lg text-gray-600 mb-8">Get instant help from our AI-powered support system</p>
-        </div>
-        <Button size="lg" onClick={() => window.location.href = "/api/auth/login"}>
-          Sign In to Continue
-        </Button>
-      </div>
-    );
-  }
-
   // Create new conversation
   const handleCreateConversation = async (deptId: number) => {
     setSelectedDepartment(deptId);
-    setShowMobileMenu(false);
     try {
       const conversation = await createConversationMutation.mutateAsync({
         departmentId: deptId,
         title: `Support - ${new Date().toLocaleDateString()}`,
       });
-      if (conversation) {
-        setConversationId(conversation.id);
-      }
+      setConversationId(conversation.id);
       setMessages([]);
     } catch (error) {
       console.error("Failed to create conversation:", error);
@@ -176,45 +147,29 @@ export default function Home() {
 
   if (!selectedDepartment) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Internal Support Chat</h1>
-              <p className="text-lg text-gray-600">Get instant help from our AI-powered support system</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Internal Support Chat</h1>
+            <p className="text-lg text-gray-600">Get instant help from our AI-powered support system</p>
           </div>
 
-          {/* Department Selection */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {departmentsQuery.isLoading ? (
-              <div className="col-span-full flex justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              </div>            ) : (
-              departmentsQuery.data?.map((dept: any) => (
-                <Card
-                  key={dept.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow hover:border-blue-500"
-                  onClick={() => handleCreateConversation(dept.id)}
-                >
-                  <CardHeader>
-                    <CardTitle className="text-lg">{dept.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4">{dept.description}</p>
-                    <Button className="w-full">Start Chat</Button>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+            {departmentsQuery.data?.map((dept) => (
+              <Card
+                key={dept.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleCreateConversation(dept.id)}
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg">{dept.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">{dept.description}</p>
+                  <Button className="mt-4 w-full">Start Chat</Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </div>
@@ -224,23 +179,17 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-200 p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex-1">
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {departmentsQuery.data?.find((d: any) => d.id === selectedDepartment)?.name}
+              {departmentsQuery.data?.find((d) => d.id === selectedDepartment)?.name}
             </h1>
             <p className="text-sm text-gray-600">Chat with our AI support agent</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 hidden md:inline">{user?.name}</span>
-            <Button variant="outline" onClick={() => setSelectedDepartment(null)}>
-              Back
-            </Button>
-            <Button variant="outline" size="sm" onClick={logout}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => setSelectedDepartment(null)}>
+            Back to Departments
+          </Button>
         </div>
       </div>
 
@@ -300,7 +249,7 @@ export default function Home() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t border-gray-200 p-4 sticky bottom-0">
+      <div className="bg-white border-t border-gray-200 p-4">
         <div className="max-w-4xl mx-auto">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
@@ -323,3 +272,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default ChatPage;
