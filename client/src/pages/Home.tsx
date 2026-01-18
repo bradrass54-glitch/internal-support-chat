@@ -1,8 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare, Trash2 } from "lucide-react";
+import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
@@ -28,8 +27,9 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TRPC hooks
@@ -46,6 +46,20 @@ export default function Home() {
     { limit: 50, offset: 0 },
     { enabled: isAuthenticated }
   );
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setSidebarOpen(true);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -138,12 +152,14 @@ export default function Home() {
   const handleNewChat = () => {
     setConversationId(null);
     setMessages([]);
+    if (isMobile) setSidebarOpen(false);
     getMainConversationQuery.refetch();
   };
 
   const handleSelectConversation = (convId: number) => {
     setConversationId(convId);
     getMessagesQuery.refetch();
+    if (isMobile) setSidebarOpen(false);
   };
 
   if (loading) {
@@ -158,8 +174,8 @@ export default function Home() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Internal Support Chat</h1>
-          <p className="text-lg text-gray-600 mb-8">Get instant help from our AI-powered support system</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Internal Support Chat</h1>
+          <p className="text-base md:text-lg text-gray-600 mb-8">Get instant help from our AI-powered support system</p>
         </div>
         <Button
           size="lg"
@@ -175,6 +191,7 @@ export default function Home() {
             url.searchParams.set("type", "signIn");
             window.location.href = url.toString();
           }}
+          className="w-full md:w-auto"
         >
           Sign In to Continue
         </Button>
@@ -192,19 +209,27 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col md:flex-row overflow-hidden">
+      {/* Mobile Overlay */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <div
-        className={`${
-          sidebarOpen ? "w-64" : "w-0"
-        } bg-gray-900 text-white transition-all duration-300 overflow-hidden flex flex-col`}
+        className={`fixed md:relative z-50 md:z-auto inset-y-0 left-0 w-64 bg-gray-900 text-white transition-transform duration-300 transform flex flex-col ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
       >
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <h2 className="font-semibold text-lg">Chat History</h2>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-1 hover:bg-gray-800 rounded"
+            className="p-1 hover:bg-gray-800 rounded md:hidden"
           >
             <X className="w-5 h-5" />
           </button>
@@ -213,7 +238,7 @@ export default function Home() {
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
-          className="m-4 flex items-center justify-center gap-2 w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+          className="m-4 flex items-center justify-center gap-2 w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors text-sm md:text-base"
         >
           <Plus className="w-5 h-5" />
           New Chat
@@ -228,7 +253,7 @@ export default function Home() {
               <button
                 key={conv.id}
                 onClick={() => handleSelectConversation(conv.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors truncate ${
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors truncate text-sm md:text-base ${
                   conversationId === conv.id
                     ? "bg-blue-600 text-white"
                     : "text-gray-300 hover:bg-gray-800"
@@ -237,7 +262,7 @@ export default function Home() {
               >
                 <div className="flex items-center gap-2 truncate">
                   <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate text-sm">{conv.title}</span>
+                  <span className="truncate">{conv.title}</span>
                 </div>
               </button>
             ))
@@ -258,32 +283,32 @@ export default function Home() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {!sidebarOpen && (
+        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+            {isMobile && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
               >
-                <Menu className="w-6 h-6 text-gray-700" />
+                <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-700" />
               </button>
             )}
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Support Chat</h1>
-              <p className="text-sm text-gray-600">AI-powered assistance for IT, HR, and Finance</p>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Support Chat</h1>
+              <p className="text-xs md:text-sm text-gray-600 hidden sm:block">AI-powered assistance for IT, HR, and Finance</p>
             </div>
           </div>
         </div>
 
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <MessageSquare className="w-16 h-16 mb-4 text-gray-300" />
-              <p className="text-lg font-medium">Start a conversation</p>
-              <p className="text-sm">Ask me anything about IT, HR, or Finance support</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+              <MessageSquare className="w-12 h-12 md:w-16 md:h-16 mb-4 text-gray-300" />
+              <p className="text-base md:text-lg font-medium">Start a conversation</p>
+              <p className="text-xs md:text-sm text-center">Ask me anything about IT, HR, or Finance support</p>
             </div>
           ) : (
             messages.map((msg) => (
@@ -292,20 +317,20 @@ export default function Home() {
                 className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-2xl px-4 py-3 rounded-lg ${
+                  className={`max-w-xs sm:max-w-sm md:max-w-2xl px-3 md:px-4 py-2 md:py-3 rounded-lg text-sm md:text-base ${
                     msg.senderType === "user"
                       ? "bg-blue-600 text-white rounded-br-none"
                       : "bg-gray-200 text-gray-900 rounded-bl-none"
                   }`}
                 >
                   {msg.isAIGenerated ? (
-                    <div className="prose prose-sm max-w-none">
+                    <div className="prose prose-sm max-w-none text-inherit">
                       <Streamdown>{msg.content}</Streamdown>
                     </div>
                   ) : (
-                    <p className="text-sm">{msg.content}</p>
+                    <p>{msg.content}</p>
                   )}
-                  <p className="text-xs mt-2 opacity-70">
+                  <p className="text-xs mt-1 md:mt-2 opacity-70">
                     {msg.createdAt.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -319,10 +344,10 @@ export default function Home() {
         </div>
 
         {/* Input Area */}
-        <div className="bg-white border-t border-gray-200 p-6">
-          <div className="max-w-4xl mx-auto flex gap-3">
+        <div className="bg-white border-t border-gray-200 p-3 md:p-6">
+          <div className="max-w-4xl mx-auto flex gap-2 md:gap-3">
             <Input
-              placeholder="Type your question or request..."
+              placeholder="Type your question..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => {
@@ -332,15 +357,16 @@ export default function Home() {
                 }
               }}
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 text-sm md:text-base"
             />
             <Button
               onClick={handleSendMessage}
               disabled={isLoading || !inputValue.trim()}
-              className="gap-2 px-6"
+              className="gap-2 px-3 md:px-6 text-sm md:text-base"
+              size="sm"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send
+              <span className="hidden sm:inline">Send</span>
             </Button>
           </div>
         </div>
