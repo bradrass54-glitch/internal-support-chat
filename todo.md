@@ -68,3 +68,9 @@
 - [ ] Add streaming support for real-time AI message generation
 - [x] Implement department context detection from user messages
 - [x] Add AI response generation with documentation context
+
+## UI/UX Improvements
+- [x] Remove test alerts from homepage
+- [x] Add ChatGPT-style sidebar with expandable chat history
+- [x] Create prominent new chat button
+- [x] Improve chat interface layout and spacing
