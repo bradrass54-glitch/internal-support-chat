@@ -34,17 +34,19 @@ export default function Home() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // TRPC hooks
-  const departmentsQuery = trpc.support.getDepartments.useQuery();
+  // TRPC hooks - only fetch departments when authenticated
+  const departmentsQuery = trpc.support.getDepartments.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   const createConversationMutation = trpc.support.createConversation.useMutation();
   const addMessageMutation = trpc.support.addMessage.useMutation();
   const getMessagesQuery = trpc.support.getMessages.useQuery(
     { conversationId: conversationId || 0, limit: 50 },
-    { enabled: !!conversationId }
+    { enabled: !!conversationId && isAuthenticated }
   );
   const getAlertsQuery = trpc.support.getAlerts.useQuery(
     { departmentId: selectedDepartment || 0 },
-    { enabled: !!selectedDepartment }
+    { enabled: !!selectedDepartment && isAuthenticated }
   );
 
   // Auto-scroll to latest message
@@ -86,7 +88,18 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Internal Support Chat</h1>
           <p className="text-lg text-gray-600 mb-8">Get instant help from our AI-powered support system</p>
         </div>
-        <Button size="lg" onClick={() => window.location.href = "/api/auth/login"}>
+        <Button size="lg" onClick={() => {
+          const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
+          const appId = import.meta.env.VITE_APP_ID;
+          const redirectUri = `${window.location.origin}/api/oauth/callback`;
+          const state = btoa(redirectUri);
+          const url = new URL(`${oauthPortalUrl}/app-auth`);
+          url.searchParams.set("appId", appId);
+          url.searchParams.set("redirectUri", redirectUri);
+          url.searchParams.set("state", state);
+          url.searchParams.set("type", "signIn");
+          window.location.href = url.toString();
+        }}>
           Sign In to Continue
         </Button>
       </div>
@@ -174,6 +187,15 @@ export default function Home() {
     );
   };
 
+  // If departments haven't loaded yet, show loading state
+  if (!departmentsQuery.data && !departmentsQuery.isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   if (!selectedDepartment) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
@@ -192,13 +214,18 @@ export default function Home() {
               </Button>
             </div>
           </div>
-
           {/* Department Selection */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {departmentsQuery.isLoading ? (
+            {departmentsQuery.isLoading || departmentsQuery.isPending ? (
               <div className="col-span-full flex justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              </div>            ) : (
+              </div>
+            ) : departmentsQuery.isError ? (
+              <div className="col-span-full text-center">
+                <p className="text-red-600 mb-4">Failed to load departments. Please refresh the page.</p>
+                <Button onClick={() => departmentsQuery.refetch()}>Retry</Button>
+              </div>
+            ) : (
               departmentsQuery.data?.map((dept: any) => (
                 <Card
                   key={dept.id}

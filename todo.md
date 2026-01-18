@@ -58,3 +58,6 @@
 - [ ] Performance testing
 - [x] Deployment configuration
 - [x] Environment setup and documentation
+
+## Bug Fixes
+- [x] Fix sign-in routing - currently redirects to 404 instead of chat interface
