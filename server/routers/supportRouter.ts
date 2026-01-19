@@ -4,6 +4,7 @@ import * as supportService from "../services/supportService";
 import * as aiService from "../services/aiService";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
+import { alerts } from "../../drizzle/schema";
 
 /**
  * Support router - handles unified chat-based support system
@@ -158,7 +159,6 @@ export const supportRouter = router({
         if (!db) return [];
 
         // Get active alerts (not expired)
-        const { alerts } = await import("../../drizzle/schema");
         const alertList = await db
           .select()
           .from(alerts)

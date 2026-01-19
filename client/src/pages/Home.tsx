@@ -30,6 +30,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [isAITyping, setIsAITyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TRPC hooks
@@ -64,7 +65,7 @@ export default function Home() {
   // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isAITyping]);
 
   // Initialize conversation
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function Home() {
     if (!inputValue.trim() || !conversationId || isLoading) return;
 
     setIsLoading(true);
+    setIsAITyping(true);
     const userMessage = inputValue;
     setInputValue("");
 
@@ -146,6 +148,7 @@ export default function Home() {
       console.error("Failed to send message:", error);
     } finally {
       setIsLoading(false);
+      setIsAITyping(false);
     }
   };
 
@@ -311,7 +314,8 @@ export default function Home() {
               <p className="text-xs md:text-sm text-center">Ask me anything about IT, HR, or Finance support</p>
             </div>
           ) : (
-            messages.map((msg) => (
+            <>
+              {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}
@@ -338,7 +342,19 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-            ))
+              ))}
+              {isAITyping && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-200 text-gray-900 rounded-lg rounded-bl-none px-3 md:px-4 py-2 md:py-3">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>

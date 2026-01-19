@@ -1,0 +1,21 @@
+{
+  "query": "SELECT * FROM alerts LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user BbizjsTVdLY9kMn.root --database Ti9rf6h7REGn5Du4P9txiB --execute SELECT * FROM alerts LIMIT 10;",
+  "rows": [
+    {
+      "id": "2",
+      "patternId": "1",
+      "departmentId": "1",
+      "title": "test",
+      "message": "test",
+      "severity": "medium",
+      "isActive": "1",
+      "createdAt": "2026-01-18 03:33:58",
+      "expiresAt": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tpatternId\tdepartmentId\ttitle\tmessage\tseverity\tisActive\tcreatedAt\texpiresAt\n2\t1\t1\ttest\ttest\tmedium\t1\t2026-01-18 03:33:58\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 367
+}
