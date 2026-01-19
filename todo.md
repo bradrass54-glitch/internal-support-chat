@@ -141,3 +141,12 @@
 - [ ] Add workspace switching for admins
 - [ ] Implement workspace-specific settings and branding
 - [ ] Create workspace invitation and member management
+
+
+## Subdomain Testing & Validation
+- [ ] Create comprehensive subdomain routing tests
+- [ ] Test workspace creation and auto-provisioning on first login
+- [ ] Verify workspace isolation between subdomains
+- [ ] Test custom domain routing
+- [ ] Add integration tests for subdomain detection
+- [ ] Create test documentation for QA

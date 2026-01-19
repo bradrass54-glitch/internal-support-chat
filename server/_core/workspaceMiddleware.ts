@@ -8,6 +8,7 @@ import { eq, or } from "drizzle-orm";
  * Examples:
  * - acme.localhost:3000 -> workspace slug: "acme"
  * - acme.example.com -> workspace slug: "acme"
+ * - w4efyq57cl-gnma6n3fbq-uk.a.run.app -> workspace slug: "w4efyq57cl-gnma6n3fbq-uk"
  * - custom.domain.com -> lookup by customDomain
  */
 export function extractWorkspaceSlug(host: string): string | null {
@@ -16,7 +17,8 @@ export function extractWorkspaceSlug(host: string): string | null {
   // Remove port if present
   const hostWithoutPort = host.split(":")[0];
 
-  // Get the first part of the domain (subdomain)
+  // Check if this is a full domain (not localhost or root domain)
+  // For domains like w4efyq57cl-gnma6n3fbq-uk.a.run.app, use everything before the first dot
   const parts = hostWithoutPort.split(".");
 
   // If we have at least 2 parts and the first part is not "www"
@@ -24,11 +26,36 @@ export function extractWorkspaceSlug(host: string): string | null {
     return parts[0].toLowerCase();
   }
 
+  // If only one part (localhost), return null
   return null;
 }
 
 /**
+ * Create default workspace for new domain
+ */
+export async function createDefaultWorkspace(slug: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db.insert(workspaces).values({
+      slug: slug.toLowerCase(),
+      name: `${slug} Workspace`,
+      ownerId: 1,
+    });
+
+    const workspaceId = (result as any).insertId as number;
+    const created = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
+    return created[0] || null;
+  } catch (error) {
+    console.error("[Workspace] Failed to create default workspace:", error);
+    return null;
+  }
+}
+
+/**
  * Resolve workspace from slug or custom domain
+ * Auto-creates workspace if it doesn't exist
  */
 export async function resolveWorkspace(host: string) {
   const db = await getDb();
@@ -49,7 +76,17 @@ export async function resolveWorkspace(host: string) {
       )
       .limit(1);
 
-    return result.length > 0 ? result[0] : null;
+    if (result.length > 0) {
+      return result[0];
+    }
+
+    // If workspace not found and we have a slug, auto-create it
+    if (slug) {
+      console.log(`[Workspace] Auto-creating workspace for slug: ${slug}`);
+      return await createDefaultWorkspace(slug);
+    }
+
+    return null;
   } catch (error) {
     console.error("[Workspace] Resolution failed:", error);
     return null;
@@ -71,11 +108,12 @@ export async function workspaceMiddleware(
     // Attach workspace to request
     (req as any).workspace = workspace;
 
-    // If no workspace found and not on root domain, return 404
+    // If no workspace found and we tried to create one, check again
     if (!workspace && extractWorkspaceSlug(host)) {
-      return res.status(404).json({
-        error: "Workspace not found",
-        message: `No workspace found for domain: ${host}`,
+      console.warn(`[Workspace Middleware] Failed to resolve workspace for domain: ${host}`);
+      return res.status(500).json({
+        error: "Workspace initialization failed",
+        message: `Could not initialize workspace for domain: ${host}`,
       });
     }
 
