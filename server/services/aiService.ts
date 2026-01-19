@@ -2,6 +2,7 @@ import { getDb } from "../db";
 import { documentationSources, messages, conversations } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
+import { getKnowledgeBaseContext } from "./knowledgeBaseService";
 
 /**
  * AI Service - generates contextual responses based on documentation and conversation history
@@ -21,11 +22,14 @@ export async function generateAIResponse(
     // Get relevant documentation for the department (if provided)
     const docs = departmentId ? await getDepartmentContext(departmentId) : await getAllDocumentation();
 
+    // Get knowledge base context for the query
+    const kbContext = departmentId ? await getKnowledgeBaseContext(departmentId, userMessage) : "";
+
     // Get recent conversation history for context
     const history = await getConversationContext(conversationId, 10);
 
-    // Build system prompt for AI
-    const systemPrompt = buildSystemPrompt(docs);
+    // Build system prompt for AI with knowledge base context
+    const systemPrompt = buildSystemPrompt(docs, kbContext);
 
     // Build message history for the LLM
     const messageHistory = buildMessageHistory(history, userMessage);
@@ -128,20 +132,24 @@ async function getConversationContext(conversationId: number, limit: number = 10
 /**
  * Build system prompt for the LLM
  */
-function buildSystemPrompt(documentation: string): string {
+function buildSystemPrompt(documentation: string, knowledgeBase: string = ""): string {
+  const kbSection = knowledgeBase
+    ? `\n\n## Knowledge Base Resources:\n${knowledgeBase}`
+    : "";
+
   return `You are a helpful internal support agent for an organization. You have access to the following documentation to help answer user questions.
 
 Your responsibilities:
-1. Answer questions based on the provided documentation
+1. Answer questions based on the provided documentation and knowledge base
 2. Be concise and helpful
 3. If you don't have information to answer a question, suggest escalating to a live agent
 4. Maintain a professional and friendly tone
 5. Provide step-by-step guidance when needed
 
 ## Available Documentation:
-${documentation || "No documentation available at this time."}
+${documentation || "No documentation available at this time."}${kbSection}
 
-Please provide helpful, accurate responses based on the documentation above.`;
+Please provide helpful, accurate responses based on the documentation and knowledge base above.`;
 }
 
 /**

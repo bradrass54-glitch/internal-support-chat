@@ -15,6 +15,13 @@
       "when": 1768706878365,
       "tag": "0001_flawless_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1768783826198,
+      "tag": "0002_brown_black_tom",
+      "breakpoints": true
     }
   ]
 }

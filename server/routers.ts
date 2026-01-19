@@ -5,9 +5,10 @@ import { publicProcedure, router } from "./_core/trpc";
 import { supportRouter } from "./routers/supportRouter";
 import { adminRouter } from "./routers/adminRouter";
 import { agentRouter } from "./routers/agentRouter";
+import { knowledgeBaseRouter } from "./routers/knowledgeBaseRouter";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -26,6 +27,8 @@ export const appRouter = router({
   admin: adminRouter,
   // Agent operations router
   agent: agentRouter,
+  // Knowledge base router
+  knowledgeBase: knowledgeBaseRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -47,10 +47,11 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="escalations">Escalations</TabsTrigger>
             <TabsTrigger value="documentation">Documentation</TabsTrigger>
+            <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
             <TabsTrigger value="audit">Audit Logs</TabsTrigger>
           </TabsList>
 
@@ -67,6 +68,11 @@ export default function AdminDashboard() {
           {/* Documentation Tab */}
           <TabsContent value="documentation" className="space-y-6">
             <DocumentationTab />
+          </TabsContent>
+
+          {/* Knowledge Base Tab */}
+          <TabsContent value="knowledge" className="space-y-6">
+            <KnowledgeBaseTab />
           </TabsContent>
 
           {/* Audit Logs Tab */}
@@ -305,6 +311,27 @@ function DocumentationTab() {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Knowledge Base Tab Component
+ */
+function KnowledgeBaseTab() {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900">Knowledge Base Management</h2>
+      <p className="text-gray-600">Upload and manage department-specific documentation for AI training</p>
+      
+      {/* Embed the KnowledgeBaseManagement component */}
+      <Card className="p-6">
+        <div className="text-center py-8 text-gray-500">
+          <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>Knowledge base management interface</p>
+          <p className="text-sm mt-2">Upload documents to train the AI system with department-specific knowledge</p>
+        </div>
+      </Card>
     </div>
   );
 }

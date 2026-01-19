@@ -291,3 +291,63 @@ export const learningInteractionsRelations = relations(learningInteractions, ({ 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
 }));
+
+
+/**
+ * Knowledge base documents table - stores uploaded department-specific documents
+ */
+export const knowledgeBaseDocuments = mysqlTable("knowledgeBaseDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  departmentId: int("departmentId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  fileKey: varchar("fileKey", { length: 255 }).notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  fileSize: int("fileSize").notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  extractedText: text("extractedText"),
+  status: mysqlEnum("status", ["uploading", "processing", "ready", "failed", "archived"]).default("uploading").notNull(),
+  uploadedBy: int("uploadedBy").notNull(),
+  version: int("version").default(1).notNull(),
+  isPublic: boolean("isPublic").default(true).notNull(),
+  tags: varchar("tags", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  archivedAt: timestamp("archivedAt"),
+}, (table) => ({
+  deptIdx: index("kbDeptIdx").on(table.departmentId),
+  statusIdx: index("kbStatusIdx").on(table.status),
+  uploadedByIdx: index("kbUploadedByIdx").on(table.uploadedBy),
+}));
+
+export type KnowledgeBaseDocument = typeof knowledgeBaseDocuments.$inferSelect;
+export type InsertKnowledgeBaseDocument = typeof knowledgeBaseDocuments.$inferInsert;
+
+/**
+ * Knowledge base chunks table - stores text chunks for semantic search
+ */
+export const knowledgeBaseChunks = mysqlTable("knowledgeBaseChunks", {
+  id: int("id").autoincrement().primaryKey(),
+  documentId: int("documentId").notNull(),
+  chunkIndex: int("chunkIndex").notNull(),
+  content: text("content").notNull(),
+  embedding: varchar("embedding", { length: 4000 }),
+  tokens: int("tokens"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  docIdx: index("kbChunkDocIdx").on(table.documentId),
+}));
+
+export type KnowledgeBaseChunk = typeof knowledgeBaseChunks.$inferSelect;
+export type InsertKnowledgeBaseChunk = typeof knowledgeBaseChunks.$inferInsert;
+
+export const knowledgeBaseDocumentsRelations = relations(knowledgeBaseDocuments, ({ one, many }) => ({
+  department: one(departments, { fields: [knowledgeBaseDocuments.departmentId], references: [departments.id] }),
+  uploadedByUser: one(users, { fields: [knowledgeBaseDocuments.uploadedBy], references: [users.id] }),
+  chunks: many(knowledgeBaseChunks),
+}));
+
+export const knowledgeBaseChunksRelations = relations(knowledgeBaseChunks, ({ one }) => ({
+  document: one(knowledgeBaseDocuments, { fields: [knowledgeBaseChunks.documentId], references: [knowledgeBaseDocuments.id] }),
+}));
