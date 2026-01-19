@@ -26,6 +26,7 @@ export const supportRouter = router({
 
       // Create new main conversation for user
       const newConversation = await supportService.createConversation(
+        ctx.workspace?.id || 1, // Use workspace ID from context
         ctx.user.id,
         1, // Default to IT department (or could be generic)
         `Support Chat - ${new Date().toLocaleDateString()}`,
@@ -205,6 +206,7 @@ export const supportRouter = router({
 
         // Create escalation ticket
         const escalation = await supportService.escalateConversation(
+          ctx.workspace?.id || 1,
           input.conversationId,
           ctx.user.id,
           input.reason,

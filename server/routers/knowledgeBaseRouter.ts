@@ -29,6 +29,7 @@ export const knowledgeBaseRouter = router({
     .mutation(async ({ input, ctx }) => {
       try {
         const documentId = await uploadKnowledgeBaseDocument(
+          ctx.workspace?.id || 1,
           input.departmentId,
           ctx.user.id,
           {

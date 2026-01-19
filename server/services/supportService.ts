@@ -57,6 +57,7 @@ export async function logAudit(
  * Create a new conversation
  */
 export async function createConversation(
+  workspaceId: number,
   userId: number,
   departmentId: number,
   title?: string,
@@ -68,6 +69,7 @@ export async function createConversation(
 
   try {
     const result = await db.insert(conversations).values({
+      workspaceId,
       userId,
       departmentId,
       title,
@@ -198,6 +200,7 @@ export async function getConversationMessages(conversationId: number, limit: num
  * Escalate conversation to agent
  */
 export async function escalateConversation(
+  workspaceId: number,
   conversationId: number,
   agentId: number,
   reason: string,
@@ -215,6 +218,7 @@ export async function escalateConversation(
 
     // Create escalation ticket
     const result = await db.insert(escalationTickets).values({
+      workspaceId,
       conversationId,
       assignedTo: agentId,
       priority,
@@ -501,6 +505,7 @@ export async function getDepartments(): Promise<typeof departments.$inferSelect[
  * Create department
  */
 export async function createDepartment(
+  workspaceId: number,
   name: string,
   description?: string,
   userId?: number,
@@ -512,6 +517,7 @@ export async function createDepartment(
 
   try {
     const result = await db.insert(departments).values({
+      workspaceId,
       name,
       description,
     });

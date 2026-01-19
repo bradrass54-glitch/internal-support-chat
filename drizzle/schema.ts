@@ -27,11 +27,46 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * Workspaces table for multi-tenant support
+ * Each company/organization gets their own workspace
+ */
+export const workspaces = mysqlTable("workspaces", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 63 }).notNull().unique(), // subdomain slug (e.g., "acme")
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  ownerId: int("ownerId").notNull(), // user who created the workspace
+  logo: varchar("logo", { length: 500 }), // URL to workspace logo
+  customDomain: varchar("customDomain", { length: 255 }), // optional custom domain
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Workspace = typeof workspaces.$inferSelect;
+export type InsertWorkspace = typeof workspaces.$inferInsert;
+
+/**
+ * Workspace members - links users to workspaces
+ */
+export const workspaceMembers = mysqlTable("workspaceMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(),
+  userId: int("userId").notNull(),
+  role: mysqlEnum("role", ["owner", "admin", "agent", "user"]).default("user").notNull(),
+  joinedAt: timestamp("joinedAt").defaultNow().notNull(),
+});
+
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
+export type InsertWorkspaceMember = typeof workspaceMembers.$inferInsert;
+
+/**
  * Department enum for routing support requests
  */
 export const departments = mysqlTable("departments", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 100 }).notNull().unique(),
+  workspaceId: int("workspaceId").notNull(), // workspace this department belongs to
+  name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -60,6 +95,7 @@ export type InsertUserDepartment = typeof userDepartments.$inferInsert;
  */
 export const conversations = mysqlTable("conversations", {
   id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(), // workspace this conversation belongs to
   userId: int("userId").notNull(),
   departmentId: int("departmentId").notNull(),
   title: varchar("title", { length: 255 }),
@@ -171,6 +207,7 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
  */
 export const escalationTickets = mysqlTable("escalationTickets", {
   id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(), // workspace this ticket belongs to
   conversationId: int("conversationId").notNull(),
   assignedTo: int("assignedTo").notNull(), // Agent ID
   priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
@@ -298,6 +335,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
  */
 export const knowledgeBaseDocuments = mysqlTable("knowledgeBaseDocuments", {
   id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(), // workspace this document belongs to
   departmentId: int("departmentId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),

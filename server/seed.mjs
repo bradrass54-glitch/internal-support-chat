@@ -7,19 +7,22 @@ async function seed() {
   console.log("🌱 Seeding database...");
 
   try {
-    // Create default departments
+    // Create default departments (use workspace ID 1 for default workspace)
     const deptResults = await db
       .insert(departments)
       .values([
         {
+          workspaceId: 1,
           name: "IT",
           description: "Information Technology support for hardware, software, and network issues",
         },
         {
+          workspaceId: 1,
           name: "HR",
           description: "Human Resources support for benefits, policies, and employee matters",
         },
         {
+          workspaceId: 1,
           name: "Finance",
           description: "Finance support for expenses, reimbursements, and financial processes",
         },

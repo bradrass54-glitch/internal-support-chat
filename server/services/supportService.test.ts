@@ -18,7 +18,7 @@ describe("Support Service", () => {
 
   describe("Conversation Management", () => {
     it("should handle conversation creation gracefully", async () => {
-      const result = await supportService.createConversation(1, 1, "Test Conversation");
+      const result = await supportService.createConversation(1, 1, 1, "Test Conversation");
       // Should return either null (DB unavailable) or a conversation object
       expect(result === null || typeof result === "object").toBe(true);
     });
@@ -51,6 +51,7 @@ describe("Support Service", () => {
   describe("Escalation Management", () => {
     it("should escalate conversation to agent", async () => {
       const result = await supportService.escalateConversation(
+        1,
         1,
         2,
         "Needs immediate attention",

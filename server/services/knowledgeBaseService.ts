@@ -39,6 +39,7 @@ export function chunkText(text: string, chunkSize: number = 500, overlap: number
  * Upload and process a knowledge base document
  */
 export async function uploadKnowledgeBaseDocument(
+  workspaceId: number,
   departmentId: number,
   userId: number,
   file: {
@@ -65,6 +66,7 @@ export async function uploadKnowledgeBaseDocument(
 
     // Create document record
     const result = await db.insert(knowledgeBaseDocuments).values({
+      workspaceId,
       departmentId,
       title: metadata.title,
       description: metadata.description,
