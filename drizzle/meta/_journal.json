@@ -29,6 +29,13 @@
       "when": 1768784500172,
       "tag": "0003_smiling_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1768786032275,
+      "tag": "0004_short_jubilee",
+      "breakpoints": true
     }
   ]
 }

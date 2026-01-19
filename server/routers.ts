@@ -7,6 +7,7 @@ import { adminRouter } from "./routers/adminRouter";
 import { agentRouter } from "./routers/agentRouter";
 import { knowledgeBaseRouter } from "./routers/knowledgeBaseRouter";
 import { setupRouter } from "./routers/setupRouter";
+import { workspaceSettingsRouter } from "./routers/workspaceSettingsRouter";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -32,6 +33,8 @@ export const appRouter = router({
   knowledgeBase: knowledgeBaseRouter,
   // Setup wizard router
   setup: setupRouter,
+  // Workspace settings router
+  workspaceSettings: workspaceSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

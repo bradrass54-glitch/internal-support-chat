@@ -389,3 +389,26 @@ export const knowledgeBaseDocumentsRelations = relations(knowledgeBaseDocuments,
 export const knowledgeBaseChunksRelations = relations(knowledgeBaseChunks, ({ one }) => ({
   document: one(knowledgeBaseDocuments, { fields: [knowledgeBaseChunks.documentId], references: [knowledgeBaseDocuments.id] }),
 }));
+
+/**
+ * Escalation rules table - defines escalation policies per workspace
+ */
+export const escalationRules = mysqlTable("escalationRules", {
+  id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(),
+  departmentId: int("departmentId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  triggerType: mysqlEnum("triggerType", ["time_elapsed", "keyword_match", "user_request", "ai_confidence"]).notNull(),
+  triggerValue: varchar("triggerValue", { length: 500 }), // e.g., "5 minutes", "refund", "0.3"
+  assignToDepartment: int("assignToDepartment"), // department to escalate to
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  workspaceDeptIdx: index("workspaceDeptIdx").on(table.workspaceId, table.departmentId),
+}));
+
+export type EscalationRule = typeof escalationRules.$inferSelect;
+export type InsertEscalationRule = typeof escalationRules.$inferInsert;
