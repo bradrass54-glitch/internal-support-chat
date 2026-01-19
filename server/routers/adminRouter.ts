@@ -1,154 +1,366 @@
 import { z } from "zod";
-import { adminProcedure, router } from "../_core/trpc";
-import * as supportService from "../services/supportService";
+import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { eq } from "drizzle-orm";
-import { escalationTickets, auditLogs } from "../../drizzle/schema";
+import { eq, gte, and, count } from "drizzle-orm";
+import {
+  conversations,
+  messages,
+  escalationTickets,
+  auditLogs,
+  patterns,
+  documentationSources,
+  departments,
+} from "../../drizzle/schema";
+import * as supportService from "../services/supportService";
 
 /**
- * Admin router - handles administrative operations for support system
- * All procedures require admin role for security
+ * Admin router - handles dashboard analytics, escalations, and documentation
+ * Protected to admin users only
  */
 export const adminRouter = router({
   /**
-   * Create a new department
+   * Get dashboard analytics summary
    */
-  createDepartment: adminProcedure
+  getAnalytics: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(100),
-        description: z.string().max(500).optional(),
+        days: z.number().int().min(1).max(90).default(7),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const department = await supportService.createDepartment(
-        input.name,
-        input.description,
-        ctx.user.id,
-        ctx.req.ip,
-        ctx.req.get("user-agent")
-      );
-      return department;
+    .query(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
+      const db = await getDb();
+      if (!db) return null;
+
+      try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - input.days);
+
+        // Total conversations
+        const totalConversations = await db
+          .select({ count: count() })
+          .from(conversations)
+          .where(gte(conversations.createdAt, startDate));
+
+        // Total messages
+        const totalMessages = await db
+          .select({ count: count() })
+          .from(messages)
+          .where(gte(messages.createdAt, startDate));
+
+        // Active escalations
+        const activeEscalations = await db
+          .select({ count: count() })
+          .from(escalationTickets)
+          .where(
+            and(
+              gte(escalationTickets.createdAt, startDate),
+              eq(escalationTickets.status, "in_progress" as any)
+            )
+          );
+
+        // Resolved escalations
+        const resolvedEscalations = await db
+          .select({ count: count() })
+          .from(escalationTickets)
+          .where(
+            and(
+              gte(escalationTickets.createdAt, startDate),
+              eq(escalationTickets.status, "resolved" as any)
+            )
+          );
+
+        // AI generated messages
+        const aiMessages = await db
+          .select({ count: count() })
+          .from(messages)
+          .where(
+            and(
+              gte(messages.createdAt, startDate),
+              eq(messages.isAIGenerated, true)
+            )
+          );
+
+        // Detected patterns
+        const detectedPatterns = await db
+          .select({ count: count() })
+          .from(patterns)
+          .where(gte(patterns.createdAt, startDate));
+
+        return {
+          period: `Last ${input.days} days`,
+          totalConversations: totalConversations[0]?.count || 0,
+          totalMessages: totalMessages[0]?.count || 0,
+          activeEscalations: activeEscalations[0]?.count || 0,
+          resolvedEscalations: resolvedEscalations[0]?.count || 0,
+          aiGeneratedMessages: aiMessages[0]?.count || 0,
+          detectedPatterns: detectedPatterns[0]?.count || 0,
+          averageMessagesPerConversation:
+            (totalMessages[0]?.count || 0) / Math.max(totalConversations[0]?.count || 1, 1),
+        };
+      } catch (error) {
+        console.error("[Admin] Failed to get analytics:", error);
+        return null;
+      }
     }),
 
   /**
-   * Add documentation source for AI training
+   * Get escalations with filters
    */
-  addDocumentation: adminProcedure
-    .input(
-      z.object({
-        departmentId: z.number().int().positive(),
-        title: z.string().min(1).max(255),
-        content: z.string().min(1),
-        url: z.string().url().optional(),
-        category: z.string().max(100).optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const doc = await supportService.addDocumentationSource(
-        input.departmentId,
-        input.title,
-        input.content,
-        input.url,
-        input.category,
-        ctx.user.id,
-        ctx.req.ip,
-        ctx.req.get("user-agent")
-      );
-      return doc;
-    }),
-
-  /**
-   * Create a proactive alert
-   */
-  createAlert: adminProcedure
-    .input(
-      z.object({
-        patternId: z.number().int().positive(),
-        departmentId: z.number().int().positive(),
-        title: z.string().min(1).max(255),
-        message: z.string().min(1),
-        severity: z.enum(["low", "medium", "high", "critical"]),
-        expiresAt: z.date().optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const alert = await supportService.createAlert(
-        input.patternId,
-        input.departmentId,
-        input.title,
-        input.message,
-        input.severity,
-        input.expiresAt,
-        ctx.user.id,
-        ctx.req.ip,
-        ctx.req.get("user-agent")
-      );
-      return alert;
-    }),
-
-  /**
-   * Get escalation tickets
-   */
-  getEscalationTickets: adminProcedure
+  getEscalations: protectedProcedure
     .input(
       z.object({
         status: z.enum(["pending", "in_progress", "resolved", "closed"]).optional(),
-        limit: z.number().int().min(1).max(100).default(50),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        limit: z.number().int().min(1).max(100).default(20),
         offset: z.number().int().min(0).default(0),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
       const db = await getDb();
       if (!db) return [];
 
       try {
         let query = db.select().from(escalationTickets);
 
+        const results = await query.limit(input.limit).offset(input.offset);
+        
+        // Filter by status and priority in memory
+        let filtered = results;
         if (input.status) {
-          query = query.where(eq(escalationTickets.status, input.status)) as any;
+          filtered = filtered.filter((t) => t.status === input.status);
+        }
+        if (input.priority) {
+          filtered = filtered.filter((t) => t.priority === input.priority);
         }
 
-        return await query.limit(input.limit).offset(input.offset);
+        return filtered.map((ticket) => ({
+          ...ticket,
+          createdAt: new Date(ticket.createdAt),
+          resolvedAt: ticket.resolvedAt ? new Date(ticket.resolvedAt) : null,
+        }));
       } catch (error) {
-        console.error("[Admin] Failed to get escalation tickets:", error);
+        console.error("[Admin] Failed to get escalations:", error);
+        return [];
+      }
+    }),
+
+  /**
+   * Update escalation status
+   */
+  updateEscalation: protectedProcedure
+    .input(
+      z.object({
+        escalationId: z.number(),
+        status: z.enum(["pending", "in_progress", "resolved", "closed"]),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
+      const db = await getDb();
+      if (!db) return null;
+
+      try {
+        const updateData: any = {
+          status: input.status,
+          updatedAt: new Date(),
+        };
+
+        if (input.notes) {
+          updateData.resolutionNotes = input.notes;
+        }
+
+        if (input.status === "resolved" || input.status === "closed") {
+          updateData.resolvedAt = new Date();
+        }
+
+        await db
+          .update(escalationTickets)
+          .set(updateData)
+          .where(eq(escalationTickets.id, input.escalationId));
+
+        // Log audit event
+        await supportService.logAudit(
+          ctx.user?.id,
+          "UPDATE_ESCALATION",
+          "escalation",
+          input.escalationId,
+          { status: input.status, notes: input.notes }
+        );
+
+        return { success: true };
+      } catch (error) {
+        console.error("[Admin] Failed to update escalation:", error);
         throw error;
       }
     }),
 
   /**
-   * Update escalation ticket status
+   * Get patterns and alerts
    */
-  updateEscalationStatus: adminProcedure
+  getPatterns: protectedProcedure
     .input(
       z.object({
-        ticketId: z.number().int().positive(),
-        status: z.enum(["pending", "in_progress", "resolved", "closed"]),
+        limit: z.number().int().min(1).max(100).default(20),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
+      const db = await getDb();
+      if (!db) return [];
+
+      try {
+        const results = await db
+          .select()
+          .from(patterns)
+          .limit(input.limit)
+          .offset(input.offset);
+
+        return results.map((pattern) => ({
+          ...pattern,
+          createdAt: new Date(pattern.createdAt),
+          updatedAt: new Date(pattern.updatedAt),
+        }));
+      } catch (error) {
+        console.error("[Admin] Failed to get patterns:", error);
+        return [];
+      }
+    }),
+
+  /**
+   * Get documentation sources
+   */
+  getDocumentation: protectedProcedure
+    .input(
+      z.object({
+        departmentId: z.number().optional(),
+        limit: z.number().int().min(1).max(100).default(20),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
+      const db = await getDb();
+      if (!db) return [];
+
+      try {
+        let query = db.select().from(documentationSources);
+
+        if (input.departmentId) {
+          query = query.where(eq(documentationSources.departmentId, input.departmentId)) as any;
+        }
+
+        const results = await query.limit(input.limit).offset(input.offset);
+
+        return results.map((doc) => ({
+          ...doc,
+          createdAt: new Date(doc.createdAt),
+          updatedAt: new Date(doc.updatedAt),
+        }));
+      } catch (error) {
+        console.error("[Admin] Failed to get documentation:", error);
+        return [];
+      }
+    }),
+
+  /**
+   * Add documentation source
+   */
+  addDocumentation: protectedProcedure
+    .input(
+      z.object({
+        departmentId: z.number(),
+        title: z.string().min(1).max(255),
+        content: z.string().min(1),
+        url: z.string().url().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) return null;
+
+      try {
+        const result = await db.insert(documentationSources).values({
+          departmentId: input.departmentId,
+          title: input.title,
+          content: input.content,
+          url: input.url,
+        });
+
+        const lastInsertId = (result as any).insertId;
+
+        // Log audit event
+        await supportService.logAudit(
+          ctx.user?.id,
+          "CREATE_DOCUMENTATION",
+          "documentation",
+          Number(lastInsertId),
+          { title: input.title, departmentId: input.departmentId }
+        );
+
+        return { success: true, id: lastInsertId };
+      } catch (error) {
+        console.error("[Admin] Failed to add documentation:", error);
+        throw error;
+      }
+    }),
+
+  /**
+   * Delete documentation source
+   */
+  deleteDocumentation: protectedProcedure
+    .input(
+      z.object({
+        documentationId: z.number(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
+      const db = await getDb();
+      if (!db) return null;
 
       try {
         await db
-          .update(escalationTickets)
-          .set({ status: input.status, resolvedAt: input.status === "resolved" ? new Date() : null })
-          .where(eq(escalationTickets.id, input.ticketId));
+          .delete(documentationSources)
+          .where(eq(documentationSources.id, input.documentationId));
 
+        // Log audit event
         await supportService.logAudit(
-          ctx.user.id,
-          "UPDATE_ESCALATION_STATUS",
-          "escalationTicket",
-          input.ticketId,
-          { status: input.status },
-          ctx.req.ip,
-          ctx.req.get("user-agent")
+          ctx.user?.id,
+          "DELETE_DOCUMENTATION",
+          "documentation",
+          input.documentationId,
+          {}
         );
 
         return { success: true };
       } catch (error) {
-        console.error("[Admin] Failed to update escalation status:", error);
+        console.error("[Admin] Failed to delete documentation:", error);
         throw error;
       }
     }),
@@ -156,16 +368,19 @@ export const adminRouter = router({
   /**
    * Get audit logs
    */
-  getAuditLogs: adminProcedure
+  getAuditLogs: protectedProcedure
     .input(
       z.object({
         action: z.string().optional(),
-        userId: z.number().int().optional(),
         limit: z.number().int().min(1).max(100).default(50),
         offset: z.number().int().min(0).default(0),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new Error("Unauthorized: Admin access required");
+      }
+
       const db = await getDb();
       if (!db) return [];
 
@@ -176,64 +391,35 @@ export const adminRouter = router({
           query = query.where(eq(auditLogs.action, input.action)) as any;
         }
 
-        if (input.userId) {
-          query = query.where(eq(auditLogs.userId, input.userId)) as any;
-        }
+        const results = await query.limit(input.limit).offset(input.offset);
 
-        return await query.orderBy(auditLogs.createdAt).limit(input.limit).offset(input.offset);
+        return results.map((log) => ({
+          ...log,
+          createdAt: new Date(log.createdAt),
+          changes: log.changes ? (typeof log.changes === 'string' ? JSON.parse(log.changes) : log.changes) : null,
+        }));
       } catch (error) {
         console.error("[Admin] Failed to get audit logs:", error);
-        throw error;
+        return [];
       }
     }),
 
   /**
-   * Trigger pattern detection for a department
+   * Get departments
    */
-  detectPatterns: adminProcedure
-    .input(z.object({ departmentId: z.number().int().positive() }))
-    .mutation(async ({ input, ctx }) => {
-      try {
-        await supportService.detectPatterns(input.departmentId);
+  getDepartments: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user?.role !== "admin") {
+      throw new Error("Unauthorized: Admin access required");
+    }
 
-        await supportService.logAudit(
-          ctx.user.id,
-          "DETECT_PATTERNS",
-          "department",
-          input.departmentId,
-          {},
-          ctx.req.ip,
-          ctx.req.get("user-agent")
-        );
-
-        return { success: true };
-      } catch (error) {
-        console.error("[Admin] Failed to detect patterns:", error);
-        throw error;
-      }
-    }),
-
-  /**
-   * Get system statistics
-   */
-  getStatistics: adminProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return null;
+    if (!db) return [];
 
     try {
-      const stats = {
-        totalConversations: 0,
-        totalMessages: 0,
-        openConversations: 0,
-        escalatedConversations: 0,
-        closedConversations: 0,
-      };
-
-      // In production, implement actual statistics queries
-      return stats;
+      return await db.select().from(departments);
     } catch (error) {
-      console.error("[Admin] Failed to get statistics:", error);
-      throw error;
+      console.error("[Admin] Failed to get departments:", error);
+      return [];
     }
   }),
 });
