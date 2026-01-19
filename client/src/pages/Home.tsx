@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare, AlertCircle } from "lucide-react";
@@ -6,6 +5,8 @@ import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 import { AgentChat } from "@/components/AgentChat";
+import { SetupWizard } from "@/components/SetupWizard";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 interface Message {
   id: number;
@@ -34,11 +35,16 @@ export default function Home() {
   const [isAITyping, setIsAITyping] = useState(false);
   const [showAgentChat, setShowAgentChat] = useState(false);
   const [escalationInProgress, setEscalationInProgress] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TRPC hooks
-  const getMainConversationQuery = trpc.support.getMainConversation.useQuery(undefined, {
+  const checkSetupQuery = trpc.setup.checkSetupStatus.useQuery(undefined, {
     enabled: isAuthenticated,
+  });
+
+  const getMainConversationQuery = trpc.support.getMainConversation.useQuery(undefined, {
+    enabled: isAuthenticated && !showSetupWizard,
   });
 
   const sendMessageMutation = trpc.support.sendMessage.useMutation();
@@ -51,6 +57,13 @@ export default function Home() {
     { enabled: isAuthenticated }
   );
   const escalateMutation = trpc.support.escalateConversation.useMutation();
+
+  // Check if setup is needed
+  useEffect(() => {
+    if (checkSetupQuery.data?.needsSetup) {
+      setShowSetupWizard(true);
+    }
+  }, [checkSetupQuery.data]);
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -220,6 +233,18 @@ export default function Home() {
           Sign In to Continue
         </Button>
       </div>
+    );
+  }
+
+  // Show setup wizard if needed
+  if (showSetupWizard) {
+    return (
+      <SetupWizard
+        onComplete={() => {
+          setShowSetupWizard(false);
+          checkSetupQuery.refetch();
+        }}
+      />
     );
   }
 
