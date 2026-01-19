@@ -170,3 +170,12 @@
 - [x] Create settings page layout and navigation
 - [x] Add form validation and error handling
 - [x] Implement settings persistence and updates
+
+
+## Admin Access Flow Improvements
+- [x] Route new workspaces to admin portal instead of chat
+- [x] Add admin toggle to switch between admin and chat interface
+- [x] Create user management panel in admin dashboard
+- [x] Implement user role elevation (user -> admin)
+- [x] Set default role to 'user' for new signups
+- [x] Add user list with role management UI

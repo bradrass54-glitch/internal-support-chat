@@ -2,14 +2,17 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, AlertCircle, FileText, LogOut, BarChart, TrendingUp } from "lucide-react";
+import { BarChart3, AlertCircle, FileText, LogOut, BarChart, TrendingUp, MessageSquare } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { LineChart, Line, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export default function AdminDashboard() {
   const { user, logout, isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("analytics");
+  const [showChatToggle, setShowChatToggle] = useState(false);
 
   // Check if user is admin
   if (isAuthenticated && user?.role !== "admin") {
@@ -37,6 +40,10 @@ export default function AdminDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{user?.name}</span>
+          <Button onClick={() => navigate("/")} variant="outline" size="sm">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Test Chat
+          </Button>
           <Button onClick={logout} variant="outline" size="sm">
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out

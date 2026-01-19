@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { Loader2, Upload, Plus, Trash2, Edit2 } from "lucide-react";
+import { Loader2, Upload, Plus, Trash2, Edit2, Shield } from "lucide-react";
 
 export default function WorkspaceSettings() {
   const { user } = useAuth();
@@ -86,10 +86,11 @@ export default function WorkspaceSettings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="branding">Branding</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="escalation">Escalation Rules</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
           </TabsList>
 
           {/* Branding Tab */}
@@ -100,60 +101,44 @@ export default function WorkspaceSettings() {
                 <CardDescription>Customize your workspace name, description, and logo</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {workspaceQuery.isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Workspace Name</label>
-                      <Input
-                        value={brandingForm.name}
-                        onChange={(e) => setBrandingForm({ ...brandingForm, name: e.target.value })}
-                        placeholder="Your workspace name"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Workspace Name</label>
+                  <Input
+                    value={brandingForm.name}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, name: e.target.value })}
+                    placeholder="Your Company Name"
+                  />
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                      <textarea
-                        value={brandingForm.description}
-                        onChange={(e) => setBrandingForm({ ...brandingForm, description: e.target.value })}
-                        placeholder="Optional description"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={4}
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <textarea
+                    value={brandingForm.description}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, description: e.target.value })}
+                    placeholder="Brief description of your workspace"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={4}
+                  />
+                </div>
 
-                    {workspaceQuery.data?.logo && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Current Logo</label>
-                        <img src={workspaceQuery.data.logo} alt="Logo" className="h-20 w-20 object-cover rounded" />
-                      </div>
-                    )}
-
-                    <Button
-                      onClick={() =>
-                        updateBrandingMutation.mutate({
-                          name: brandingForm.name,
-                          description: brandingForm.description,
-                        })
-                      }
-                      disabled={updateBrandingMutation.isPending}
-                      className="w-full"
-                    >
-                      {updateBrandingMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Branding"
-                      )}
-                    </Button>
-                  </>
-                )}
+                <Button
+                  onClick={() => {
+                    updateBrandingMutation.mutate({
+                      name: brandingForm.name,
+                      description: brandingForm.description,
+                    });
+                  }}
+                  disabled={updateBrandingMutation.isPending}
+                >
+                  {updateBrandingMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -163,8 +148,8 @@ export default function WorkspaceSettings() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Create New Department</CardTitle>
-                  <CardDescription>Add a new support department to your workspace</CardDescription>
+                  <CardTitle>Create Department</CardTitle>
+                  <CardDescription>Add a new support department</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -172,7 +157,7 @@ export default function WorkspaceSettings() {
                     <Input
                       value={newDepartment.name}
                       onChange={(e) => setNewDepartment({ ...newDepartment, name: e.target.value })}
-                      placeholder="e.g., IT Support"
+                      placeholder="e.g., IT Support, HR, Finance"
                     />
                   </div>
 
@@ -181,7 +166,7 @@ export default function WorkspaceSettings() {
                     <textarea
                       value={newDepartment.description}
                       onChange={(e) => setNewDepartment({ ...newDepartment, description: e.target.value })}
-                      placeholder="Department description"
+                      placeholder="What does this department handle?"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       rows={3}
                     />
@@ -210,7 +195,7 @@ export default function WorkspaceSettings() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Existing Departments</CardTitle>
+                  <CardTitle>Departments</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {departmentsQuery.isLoading ? (
@@ -225,7 +210,7 @@ export default function WorkspaceSettings() {
                         <div key={dept.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                           <div>
                             <h3 className="font-medium text-gray-900">{dept.name}</h3>
-                            {dept.description && <p className="text-sm text-gray-600">{dept.description}</p>}
+                            <p className="text-sm text-gray-600">{dept.description}</p>
                           </div>
                           <Button
                             variant="ghost"
@@ -250,18 +235,9 @@ export default function WorkspaceSettings() {
               <Card>
                 <CardHeader>
                   <CardTitle>Create Escalation Rule</CardTitle>
-                  <CardDescription>Define when conversations should be escalated to live agents</CardDescription>
+                  <CardDescription>Define automatic escalation triggers</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rule Name</label>
-                    <Input
-                      value={newRule.name}
-                      onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
-                      placeholder="e.g., High Priority Issues"
-                    />
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
                     <select
@@ -279,6 +255,15 @@ export default function WorkspaceSettings() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Rule Name</label>
+                    <Input
+                      value={newRule.name}
+                      onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
+                      placeholder="e.g., Escalate after 5 minutes"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Trigger Type</label>
                     <select
                       value={newRule.triggerType}
@@ -287,8 +272,7 @@ export default function WorkspaceSettings() {
                     >
                       <option value="time_elapsed">Time Elapsed</option>
                       <option value="keyword_match">Keyword Match</option>
-                      <option value="user_request">User Request</option>
-                      <option value="ai_confidence">AI Confidence</option>
+                      <option value="satisfaction_score">Satisfaction Score</option>
                     </select>
                   </div>
 
@@ -385,8 +369,97 @@ export default function WorkspaceSettings() {
               </Card>
             </div>
           </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Members</CardTitle>
+                <CardDescription>Manage workspace users and their roles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UsersManagementTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+    </div>
+  );
+}
+
+function UsersManagementTab() {
+  const usersQuery = trpc.users.getWorkspaceUsers.useQuery();
+  const updateRoleMutation = trpc.users.updateUserRole.useMutation({
+    onSuccess: () => {
+      toast.success("User role updated successfully");
+      usersQuery.refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  if (usersQuery.isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {usersQuery.data?.length === 0 ? (
+        <p className="text-gray-500">No users in this workspace yet</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Email</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Role</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Joined</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usersQuery.data?.map((u) => (
+                <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-4 text-gray-900">{u.name || "Unnamed"}</td>
+                  <td className="py-3 px-4 text-gray-600">{u.email || "No email"}</td>
+                  <td className="py-3 px-4">
+                    <select
+                      value={u.role}
+                      onChange={(e) =>
+                        updateRoleMutation.mutate({
+                          userId: u.id,
+                          role: e.target.value as "user" | "admin",
+                        })
+                      }
+                      disabled={updateRoleMutation.isPending}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-gray-600">
+                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "Unknown"}
+                  </td>
+                  <td className="py-3 px-4">
+                    {u.role === "admin" && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">
+                        <Shield className="w-3 h-3" />
+                        Admin
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
