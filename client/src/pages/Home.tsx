@@ -1,10 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare } from "lucide-react";
+import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare, AlertCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
+import { AgentChat } from "@/components/AgentChat";
 
 interface Message {
   id: number;
@@ -31,6 +32,8 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [isAITyping, setIsAITyping] = useState(false);
+  const [showAgentChat, setShowAgentChat] = useState(false);
+  const [escalationInProgress, setEscalationInProgress] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TRPC hooks
@@ -47,6 +50,7 @@ export default function Home() {
     { limit: 50, offset: 0 },
     { enabled: isAuthenticated }
   );
+  const escalateMutation = trpc.support.escalateConversation.useMutation();
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -163,6 +167,23 @@ export default function Home() {
     setConversationId(convId);
     getMessagesQuery.refetch();
     if (isMobile) setSidebarOpen(false);
+  };
+
+  const handleEscalate = async () => {
+    if (!conversationId || escalationInProgress) return;
+    
+    setEscalationInProgress(true);
+    try {
+      await escalateMutation.mutateAsync({
+        conversationId,
+        reason: "User requested live agent assistance",
+      });
+      setShowAgentChat(true);
+    } catch (error) {
+      console.error("Escalation failed:", error);
+    } finally {
+      setEscalationInProgress(false);
+    }
   };
 
   if (loading) {
@@ -361,7 +382,20 @@ export default function Home() {
 
         {/* Input Area */}
         <div className="bg-white border-t border-gray-200 p-3 md:p-6">
-          <div className="max-w-4xl mx-auto flex gap-2 md:gap-3">
+          <div className="max-w-4xl mx-auto space-y-3">
+            {!showAgentChat && (
+              <Button
+                onClick={handleEscalate}
+                disabled={escalationInProgress}
+                variant="outline"
+                className="w-full gap-2"
+                size="sm"
+              >
+                <AlertCircle className="w-4 h-4" />
+                {escalationInProgress ? "Connecting to agent..." : "Escalate to Live Agent"}
+              </Button>
+            )}
+            <div className="flex gap-2 md:gap-3">
             <Input
               placeholder="Type your question..."
               value={inputValue}
@@ -384,9 +418,24 @@ export default function Home() {
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span className="hidden sm:inline">Send</span>
             </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Agent Chat Modal */}
+      {showAgentChat && conversationId && user && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl h-96 md:h-full md:max-h-96 lg:max-h-full">
+            <AgentChat
+              conversationId={conversationId}
+              userId={user.id}
+              agentId={1}
+              onClose={() => setShowAgentChat(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
