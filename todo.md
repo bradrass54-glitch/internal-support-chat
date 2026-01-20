@@ -179,3 +179,23 @@
 - [x] Implement user role elevation (user -> admin)
 - [x] Set default role to 'user' for new signups
 - [x] Add user list with role management UI
+
+
+## Agent Dashboard Feature
+- [x] Create dedicated agent dashboard interface
+- [x] Build escalation ticket list with filtering
+- [x] Implement ticket acceptance and assignment
+- [ ] Add agent availability status management
+- [x] Create ticket transfer between agents
+- [ ] Build real-time notification system for new escalations
+- [x] Add agent performance metrics
+- [x] Implement ticket resolution workflow
+
+
+## Next Phase - Email Invitations & Notifications
+- [ ] Build email-based invitation system for admins
+- [ ] Implement pre-assigned roles for invited users
+- [ ] Add real-time notification badges for new escalations
+- [ ] Add pattern alert notifications to dashboard sidebar
+- [ ] Implement notification preferences per user
+- [ ] Add agent availability status tracking
