@@ -243,3 +243,11 @@
 - [x] Fix escalation menu items - not clickable/no detail views
 - [x] Fix admin dashboard menu navigation - buttons don't work
 - [x] Add click handlers to all interactive menu items
+
+
+## Admin Conversation Viewing Feature
+- [x] Add conversation history to escalation detail view
+- [x] Create admin chat browser to view all conversations
+- [x] Enable admins to reply to conversations
+- [x] Show message timestamps and sender info
+- [ ] Add message search within conversations

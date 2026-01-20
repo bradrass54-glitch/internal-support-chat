@@ -56,8 +56,8 @@ export default function AdminDashboard() {
           <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="escalations">Escalations</TabsTrigger>
+            <TabsTrigger value="conversations">Conversations</TabsTrigger>
             <TabsTrigger value="documentation">Documentation</TabsTrigger>
-            <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
             <TabsTrigger value="audit">Audit Logs</TabsTrigger>
           </TabsList>
 
@@ -71,14 +71,14 @@ export default function AdminDashboard() {
             <EscalationsTab />
           </TabsContent>
 
+          {/* Conversations Tab */}
+          <TabsContent value="conversations" className="space-y-6">
+            <ConversationsTab />
+          </TabsContent>
+
           {/* Documentation Tab */}
           <TabsContent value="documentation" className="space-y-6">
             <DocumentationTab />
-          </TabsContent>
-
-          {/* Knowledge Base Tab */}
-          <TabsContent value="knowledge" className="space-y-6">
-            <KnowledgeBaseTab />
           </TabsContent>
 
           {/* Audit Logs Tab */}
@@ -265,11 +265,39 @@ function EscalationsTab() {
 }
 
 /**
- * Escalation Detail View Component
+ * Escalation Detail View Component with Conversation History
  */
 function EscalationDetailView({ ticketId }: { ticketId: number }) {
   const escalationsQuery = trpc.admin.getEscalations.useQuery({ limit: 100 });
   const ticket = escalationsQuery.data?.find((t) => t.id === ticketId);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  // Fetch conversation with messages
+  const conversationQuery = trpc.adminConversations.getEscalationWithConversation.useQuery(
+    { escalationId: ticketId },
+    { enabled: !!ticket }
+  );
+
+  const sendReplyMutation = trpc.adminConversations.sendAdminMessage.useMutation({
+    onSuccess: () => {
+      setReplyMessage("");
+      conversationQuery.refetch();
+    },
+  });
+
+  const handleSendReply = async () => {
+    if (!replyMessage.trim() || !conversationQuery.data) return;
+    setIsSending(true);
+    try {
+      await sendReplyMutation.mutateAsync({
+        conversationId: conversationQuery.data.conversation.id,
+        content: replyMessage,
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   if (escalationsQuery.isLoading) {
     return <div className="text-center py-8">Loading ticket details...</div>;
@@ -285,34 +313,240 @@ function EscalationDetailView({ ticketId }: { ticketId: number }) {
   }
 
   return (
+    <div className="space-y-4">
+      {/* Ticket Info */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold">Ticket #{ticket.id}</h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-600">Status</p>
+            <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-600">Priority</p>
+            <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-gray-600 mb-2">Reason</p>
+          <p className="text-gray-900">{ticket.reason}</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-gray-600 mb-2">Assigned To</p>
+          <p className="text-gray-900">{ticket.assignedTo || "Unassigned"}</p>
+        </div>
+
+        <div className="pt-4 border-t border-gray-200">
+          <p className="text-xs text-gray-500">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
+        </div>
+      </Card>
+
+      {/* Conversation History */}
+      {conversationQuery.isLoading ? (
+        <Card className="p-6 text-center text-gray-500">
+          <p>Loading conversation history...</p>
+        </Card>
+      ) : conversationQuery.data ? (
+        <Card className="p-6 space-y-4">
+          <h4 className="font-semibold text-gray-900">Conversation History</h4>
+          <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+            {conversationQuery.data.messages.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">No messages in this conversation</p>
+            ) : (
+              conversationQuery.data.messages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                      msg.senderType === "user"
+                        ? "bg-blue-600 text-white rounded-br-none"
+                        : msg.senderType === "agent"
+                          ? "bg-gray-300 text-gray-900 rounded-bl-none"
+                          : "bg-yellow-100 text-gray-900 rounded-bl-none"
+                    }`}
+                  >
+                    <p>{msg.content}</p>
+                    <p className="text-xs opacity-70 mt-1">{new Date(msg.createdAt).toLocaleTimeString()}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Reply Input */}
+          <div className="space-y-2 pt-4 border-t border-gray-200">
+            <textarea
+              value={replyMessage}
+              onChange={(e) => setReplyMessage(e.target.value)}
+              placeholder="Type your response here..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              rows={3}
+            />
+            <Button
+              onClick={handleSendReply}
+              disabled={!replyMessage.trim() || isSending}
+              className="w-full"
+            >
+              {isSending ? "Sending..." : "Send Reply"}
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Conversations Tab Component
+ */
+function ConversationsTab() {
+  const conversationsQuery = trpc.adminConversations.getAllConversations.useQuery({ limit: 50 });
+  const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+
+  if (conversationsQuery.isLoading) {
+    return <div className="text-center py-8">Loading conversations...</div>;
+  }
+
+  const conversations = conversationsQuery.data || [];
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900">All Conversations</h2>
+
+      {selectedConvId ? (
+        <div>
+          <Button onClick={() => setSelectedConvId(null)} variant="outline" size="sm" className="mb-4">
+            ← Back to List
+          </Button>
+          <ConversationDetailView conversationId={selectedConvId} />
+        </div>
+      ) : conversations.length === 0 ? (
+        <Card className="p-8 text-center text-gray-500">
+          <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No conversations found</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {conversations.map((conv) => (
+            <Card
+              key={conv.id}
+              className="p-4 hover:bg-gray-50 transition cursor-pointer"
+              onClick={() => setSelectedConvId(conv.id)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold">Conversation #{conv.id}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{conv.title || "Untitled"}</p>
+                  <p className="text-xs text-gray-500 mt-1">Updated: {new Date(conv.updatedAt).toLocaleString()}</p>
+                </div>
+                <div className="text-gray-400 ml-4">→</div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Conversation Detail View Component
+ */
+function ConversationDetailView({ conversationId }: { conversationId: number }) {
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const conversationQuery = trpc.adminConversations.getConversationWithMessages.useQuery({
+    conversationId,
+  });
+
+  const sendReplyMutation = trpc.adminConversations.sendAdminMessage.useMutation({
+    onSuccess: () => {
+      setReplyMessage("");
+      conversationQuery.refetch();
+    },
+  });
+
+  const handleSendReply = async () => {
+    if (!replyMessage.trim()) return;
+    setIsSending(true);
+    try {
+      await sendReplyMutation.mutateAsync({
+        conversationId,
+        content: replyMessage,
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  if (conversationQuery.isLoading) {
+    return <div className="text-center py-8">Loading conversation...</div>;
+  }
+
+  if (!conversationQuery.data) {
+    return (
+      <Card className="p-8 text-center text-gray-500">
+        <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+        <p>Conversation not found</p>
+      </Card>
+    );
+  }
+
+  const { conversation, messages } = conversationQuery.data;
+
+  return (
     <Card className="p-6 space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">Ticket #{ticket.id}</h3>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm font-semibold text-gray-600">Status</p>
-          <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-600">Priority</p>
-          <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
-        </div>
-      </div>
-
       <div>
-        <p className="text-sm font-semibold text-gray-600 mb-2">Reason</p>
-        <p className="text-gray-900">{ticket.reason}</p>
+        <h3 className="text-xl font-bold">Conversation #{conversation.id}</h3>
+        <p className="text-sm text-gray-600">{conversation.title || "Untitled"}</p>
       </div>
 
-      <div>
-        <p className="text-sm font-semibold text-gray-600 mb-2">Assigned To</p>
-        <p className="text-gray-900">{ticket.assignedTo || "Unassigned"}</p>
+      <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+        {messages.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">No messages in this conversation</p>
+        ) : (
+          messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                  msg.senderType === "user"
+                    ? "bg-blue-600 text-white rounded-br-none"
+                    : msg.senderType === "agent"
+                      ? "bg-gray-300 text-gray-900 rounded-bl-none"
+                      : "bg-yellow-100 text-gray-900 rounded-bl-none"
+                }`}
+              >
+                <p>{msg.content}</p>
+                <p className="text-xs opacity-70 mt-1">{new Date(msg.createdAt).toLocaleTimeString()}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      <div className="pt-4 border-t border-gray-200">
-        <p className="text-xs text-gray-500">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
+      {/* Reply Input */}
+      <div className="space-y-2 pt-4 border-t border-gray-200">
+        <textarea
+          value={replyMessage}
+          onChange={(e) => setReplyMessage(e.target.value)}
+          placeholder="Type your response here..."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          rows={3}
+        />
+        <Button
+          onClick={handleSendReply}
+          disabled={!replyMessage.trim() || isSending}
+          className="w-full"
+        >
+          {isSending ? "Sending..." : "Send Reply"}
+        </Button>
       </div>
     </Card>
   );
@@ -349,20 +583,6 @@ function DocumentationTab() {
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Documentation List</h3>
         <p className="text-gray-600">No documentation items yet</p>
-      </Card>
-    </div>
-  );
-}
-
-/**
- * Knowledge Base Tab Component
- */
-function KnowledgeBaseTab() {
-  return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Knowledge Base</h3>
-        <p className="text-gray-600">Knowledge base management coming soon</p>
       </Card>
     </div>
   );
