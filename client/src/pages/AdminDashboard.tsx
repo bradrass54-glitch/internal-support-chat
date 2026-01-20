@@ -1,5 +1,5 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, AlertCircle, FileText, LogOut, BarChart, TrendingUp, MessageSquare } from "lucide-react";
@@ -39,7 +39,7 @@ export default function AdminDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{user?.name}</span>
-          <Button onClick={() => navigate("/")} variant="outline" size="sm">
+          <Button onClick={() => navigate("/chat")} variant="outline" size="sm">
             <MessageSquare className="w-4 h-4 mr-2" />
             Test Chat
           </Button>
@@ -576,7 +576,14 @@ function DocumentationTab() {
             onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
           />
-          <Button className="w-full">Add Documentation</Button>
+          <Button className="w-full" onClick={() => {
+            if (newDoc.title && newDoc.content) {
+              alert(`Documentation added: ${newDoc.title}`);
+              setNewDoc({ title: "", content: "", departmentId: 1 });
+            } else {
+              alert("Please fill in all fields");
+            }
+          }}>Add Documentation</Button>
         </div>
       </Card>
 

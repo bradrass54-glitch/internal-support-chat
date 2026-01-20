@@ -266,3 +266,9 @@
 - [x] Implement streaming AI response generation on backend
 - [x] Add streaming support to frontend chat UI
 - [x] Test streaming responses end-to-end
+
+
+## Button Functionality Bugs (Current Sprint)
+- [x] Fix Add Documentation button - now has onClick handler
+- [x] Fix Test Chat button - now navigates to /chat
+- [x] Fix View Conversation button - already implemented with click handlers
