@@ -199,3 +199,36 @@
 - [ ] Add pattern alert notifications to dashboard sidebar
 - [ ] Implement notification preferences per user
 - [ ] Add agent availability status tracking
+
+
+## Critical Missing Features (Phase 1)
+- [x] User profile page (view/edit account information)
+- [x] Conversation search and filtering by keywords/date/department
+- [x] Email invitation system for admins to invite team members
+- [x] Agent availability status (online/busy/offline toggle)
+- [x] Real-time notification system for new escalations
+- [x] User feedback/rating system for AI responses (1-5 stars)
+
+## High Priority Missing Features (Phase 2)
+- [ ] Email notifications for escalations and resolutions
+- [ ] Agent private notes on escalations
+- [ ] Canned responses library for agents
+- [ ] Escalation SLA tracking and alerts
+- [ ] Department-specific analytics dashboard
+- [ ] Conversation export (PDF/CSV)
+
+## Medium Priority Missing Features (Phase 3)
+- [ ] Conversation archival and restoration
+- [ ] Conversation tagging system
+- [ ] Bulk user import from CSV
+- [ ] Custom escalation fields
+- [ ] Workflow automation rules (auto-assign, auto-close)
+- [ ] API key management for integrations
+
+## Nice to Have Features (Phase 4)
+- [ ] Custom report builder
+- [ ] Scheduled report delivery
+- [ ] Slack/Teams integration
+- [ ] SMS support channel
+- [ ] Webhook support for external integrations
+- [ ] System health monitoring dashboard
