@@ -251,3 +251,11 @@
 - [x] Enable admins to reply to conversations
 - [x] Show message timestamps and sender info
 - [ ] Add message search within conversations
+
+
+## Workspace Management UI (Current Sprint)
+- [x] Create workspace management backend APIs
+- [x] Build team members management interface
+- [x] Implement user invitation and role assignment
+- [x] Create workspace settings configuration UI
+- [ ] Add workspace switching for admins

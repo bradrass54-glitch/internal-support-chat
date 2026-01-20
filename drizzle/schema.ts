@@ -412,3 +412,22 @@ export const escalationRules = mysqlTable("escalationRules", {
 
 export type EscalationRule = typeof escalationRules.$inferSelect;
 export type InsertEscalationRule = typeof escalationRules.$inferInsert;
+
+
+/**
+ * Workspace invitations - for inviting new team members
+ */
+export const invitations = mysqlTable("invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  workspaceId: int("workspaceId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  role: mysqlEnum("role", ["owner", "admin", "agent", "user"]).default("user").notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  status: mysqlEnum("status", ["pending", "accepted", "cancelled", "expired"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  acceptedAt: timestamp("acceptedAt"),
+});
+
+export type Invitation = typeof invitations.$inferSelect;
+export type InsertInvitation = typeof invitations.$inferInsert;

@@ -36,6 +36,13 @@
       "when": 1768786032275,
       "tag": "0004_short_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1768882832105,
+      "tag": "0005_special_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

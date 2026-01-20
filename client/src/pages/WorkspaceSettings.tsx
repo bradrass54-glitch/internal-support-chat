@@ -86,11 +86,12 @@ export default function WorkspaceSettings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="branding">Branding</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="escalation">Escalation Rules</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="team">Team Members</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
           </TabsList>
 
           {/* Branding Tab */}
@@ -370,15 +371,28 @@ export default function WorkspaceSettings() {
             </div>
           </TabsContent>
 
-          {/* Users Tab */}
-          <TabsContent value="users">
+          {/* Team Members Tab */}
+          <TabsContent value="team">
             <Card>
               <CardHeader>
                 <CardTitle>Team Members</CardTitle>
                 <CardDescription>Manage workspace users and their roles</CardDescription>
               </CardHeader>
               <CardContent>
-                <UsersManagementTab />
+                <TeamMembersTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Invitations Tab */}
+          <TabsContent value="invitations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite Team Members</CardTitle>
+                <CardDescription>Send invitations to join your workspace</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InvitationsTab />
               </CardContent>
             </Card>
           </TabsContent>
@@ -388,7 +402,7 @@ export default function WorkspaceSettings() {
   );
 }
 
-function UsersManagementTab() {
+function TeamMembersTab() {
   const usersQuery = trpc.users.getWorkspaceUsers.useQuery();
   const updateRoleMutation = trpc.users.updateUserRole.useMutation({
     onSuccess: () => {
@@ -460,6 +474,151 @@ function UsersManagementTab() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function InvitationsTab() {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"owner" | "admin" | "agent" | "user">("user");
+  const invitationsQuery = trpc.workspaceManagement.getPendingInvitations.useQuery({ limit: 100 });
+  const sendInvitationMutation = trpc.workspaceManagement.sendInvitation.useMutation({
+    onSuccess: () => {
+      toast.success("Invitation sent successfully");
+      setEmail("");
+      setRole("user");
+      invitationsQuery.refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const resendMutation = trpc.workspaceManagement.resendInvitation.useMutation({
+    onSuccess: () => {
+      toast.success("Invitation resent");
+      invitationsQuery.refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const cancelMutation = trpc.workspaceManagement.cancelInvitation.useMutation({
+    onSuccess: () => {
+      toast.success("Invitation cancelled");
+      invitationsQuery.refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const handleSendInvitation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    await sendInvitationMutation.mutateAsync({
+      email: email.trim(),
+      role,
+    });
+  };
+
+  if (invitationsQuery.isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  const invitations = invitationsQuery.data || [];
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Invitation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSendInvitation} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@example.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="user">User</option>
+                <option value="agent">Agent</option>
+                <option value="admin">Admin</option>
+                <option value="owner">Owner</option>
+              </select>
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={sendInvitationMutation.isPending || !email.trim()}
+            >
+              {sendInvitationMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending Invitations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {invitations.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No pending invitations</p>
+          ) : (
+            <div className="space-y-2">
+              {invitations.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium text-gray-900">{inv.email}</p>
+                    <p className="text-sm text-gray-600">
+                      Role: <span className="font-medium">{inv.role}</span> • Expires: {new Date(inv.expiresAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => resendMutation.mutate({ invitationId: inv.id })}
+                      variant="outline"
+                      size="sm"
+                      disabled={resendMutation.isPending}
+                    >
+                      Resend
+                    </Button>
+                    <Button
+                      onClick={() => cancelMutation.mutate({ invitationId: inv.id })}
+                      variant="destructive"
+                      size="sm"
+                      disabled={cancelMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
