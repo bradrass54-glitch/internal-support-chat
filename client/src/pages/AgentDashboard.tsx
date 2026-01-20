@@ -172,7 +172,7 @@ export default function AgentDashboard() {
                     <p className="text-sm text-gray-500">Loading escalations...</p>
                   ) : escalations && escalations.length > 0 ? (
                     escalations.map((escalation: any) => (
-                      <button
+                      <div
                         key={escalation.id}
                         onClick={() => setSelectedEscalation(escalation.id)}
                         className={`w-full p-3 rounded-lg text-left border transition-colors ${
@@ -192,7 +192,7 @@ export default function AgentDashboard() {
                         <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                           {escalation.reason}
                         </p>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-2">
                           <Badge className={getStatusColor(escalation.status)}>
                             {escalation.status}
                           </Badge>
@@ -202,7 +202,15 @@ export default function AgentDashboard() {
                             })}
                           </span>
                         </div>
-                      </button>
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => alert("Status updated")}>
+                            {escalation.status === "pending" ? "Accept" : "Resolve"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => alert("Transfer dialog")}>
+                            Transfer
+                          </Button>
+                        </div>
+                      </div>
                     ))
                   ) : (
                     <p className="text-sm text-gray-500">No escalations assigned</p>

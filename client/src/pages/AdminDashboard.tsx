@@ -243,9 +243,9 @@ function EscalationsTab() {
       ) : (
         <div className="space-y-2">
           {filtered.map((ticket) => (
-            <Card key={ticket.id} className="p-4 hover:bg-gray-50 transition cursor-pointer" onClick={() => setSelectedTicket(ticket.id)}>
+            <Card key={ticket.id} className="p-4 hover:bg-gray-50 transition">
               <div className="flex items-center justify-between">
-                <div className="flex-1">
+                <div className="flex-1 cursor-pointer" onClick={() => setSelectedTicket(ticket.id)}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold">Ticket #{ticket.id}</span>
                     <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
@@ -254,7 +254,14 @@ function EscalationsTab() {
                   <p className="text-sm text-gray-600">{ticket.reason}</p>
                   <p className="text-xs text-gray-500 mt-1">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
                 </div>
-                <div className="text-gray-400 ml-4">→</div>
+                <div className="flex items-center gap-2 ml-4">
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); alert("Status updated"); }}>
+                    {ticket.status === "pending" ? "Start" : "Resolve"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); alert("Transfer dialog"); }}>
+                    Transfer
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}

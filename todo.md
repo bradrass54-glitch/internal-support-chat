@@ -272,3 +272,11 @@
 - [x] Fix Add Documentation button - now has onClick handler
 - [x] Fix Test Chat button - now navigates to /chat
 - [x] Fix View Conversation button - already implemented with click handlers
+
+
+## Quick Action Buttons Feature (Current Sprint)
+- [x] Add backend APIs for quick actions on escalations
+- [x] Update AdminDashboard escalation cards with quick action buttons
+- [x] Update AgentDashboard escalation cards with quick action buttons
+- [ ] Add confirmation dialogs for critical actions (placeholder alerts for now)
+- [x] Test quick action functionality
