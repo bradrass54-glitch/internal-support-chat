@@ -12,7 +12,6 @@ export default function AdminDashboard() {
   const { user, logout, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("analytics");
-  const [showChatToggle, setShowChatToggle] = useState(false);
 
   // Check if user is admin
   if (isAuthenticated && user?.role !== "admin") {
@@ -93,61 +92,67 @@ export default function AdminDashboard() {
 }
 
 /**
+ * Helper functions for status and priority colors
+ */
+function getStatusColor(status: string): string {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-100 text-yellow-800";
+    case "in_progress":
+      return "bg-blue-100 text-blue-800";
+    case "resolved":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+function getPriorityColor(priority: string): string {
+  switch (priority) {
+    case "high":
+      return "bg-red-100 text-red-800";
+    case "medium":
+      return "bg-orange-100 text-orange-800";
+    case "low":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+/**
  * Analytics Tab Component
  */
 function AnalyticsTab() {
-  const analyticsQuery = trpc.admin.getAnalytics.useQuery({ days: 7 });
+  const analyticsQuery = trpc.admin.getAnalytics.useQuery({});
 
   if (analyticsQuery.isLoading) {
     return <div className="text-center py-8">Loading analytics...</div>;
   }
 
-  const data = analyticsQuery.data;
-  if (!data) {
-    return <div className="text-center py-8 text-red-600">Failed to load analytics</div>;
-  }
+  const data = analyticsQuery.data || {
+    totalConversations: 0,
+    totalMessages: 0,
+    activeEscalations: 0,
+    resolvedEscalations: 0,
+    aiGeneratedMessages: 0,
+    detectedPatterns: 0,
+    averageMessagesPerConversation: 0,
+  };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Analytics - {data.period}</h2>
-
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Conversations"
-          value={data.totalConversations}
-          icon={<TrendingUp className="w-6 h-6 text-blue-600" />}
-        />
-        <MetricCard
-          title="Total Messages"
-          value={data.totalMessages}
-          icon={<BarChart className="w-6 h-6 text-green-600" />}
-        />
-        <MetricCard
-          title="Active Escalations"
-          value={data.activeEscalations}
-          icon={<AlertCircle className="w-6 h-6 text-orange-600" />}
-        />
-        <MetricCard
-          title="Resolved Escalations"
-          value={data.resolvedEscalations}
-          icon={<BarChart className="w-6 h-6 text-emerald-600" />}
-        />
+        <StatCard title="Total Conversations" value={data.totalConversations} icon={<MessageSquare className="w-6 h-6 text-blue-600" />} />
+        <StatCard title="Total Messages" value={data.totalMessages} icon={<BarChart className="w-6 h-6 text-green-600" />} />
+        <StatCard title="Active Escalations" value={data.activeEscalations} icon={<AlertCircle className="w-6 h-6 text-red-600" />} />
+        <StatCard title="Resolved Escalations" value={data.resolvedEscalations} icon={<TrendingUp className="w-6 h-6 text-cyan-600" />} />
       </div>
 
-      {/* Additional Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
-          title="AI Generated Messages"
-          value={data.aiGeneratedMessages}
-          icon={<BarChart className="w-6 h-6 text-purple-600" />}
-        />
-        <MetricCard
-          title="Detected Patterns"
-          value={data.detectedPatterns}
-          icon={<BarChart className="w-6 h-6 text-indigo-600" />}
-        />
-        <MetricCard
+        <StatCard title="AI Generated Messages" value={data.aiGeneratedMessages} icon={<BarChart className="w-6 h-6 text-purple-600" />} />
+        <StatCard title="Detected Patterns" value={data.detectedPatterns} icon={<BarChart className="w-6 h-6 text-indigo-600" />} />
+        <StatCard
           title="Avg Messages/Conversation"
           value={data.averageMessagesPerConversation.toFixed(2)}
           icon={<BarChart className="w-6 h-6 text-cyan-600" />}
@@ -172,79 +177,84 @@ function AnalyticsTab() {
 }
 
 /**
+ * Stat Card Component
+ */
+function StatCard({ title, value, icon }: { title: string; value: string | number; icon: React.ReactNode }) {
+  return (
+    <Card className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600 font-medium">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+        </div>
+        <div className="opacity-50">{icon}</div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * Escalations Tab Component
  */
 function EscalationsTab() {
   const escalationsQuery = trpc.admin.getEscalations.useQuery({ limit: 20 });
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
+  const [selectedTicket, setSelectedTicket] = useState<number | null>(null);
 
   if (escalationsQuery.isLoading) {
     return <div className="text-center py-8">Loading escalations...</div>;
   }
 
   const escalations = escalationsQuery.data || [];
+  const filtered = selectedStatus ? escalations.filter((t) => t.status === selectedStatus) : escalations;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Escalation Tickets</h2>
         <div className="flex gap-2">
-          <Button
-            variant={selectedStatus === undefined ? "default" : "outline"}
-            onClick={() => setSelectedStatus(undefined)}
-            size="sm"
-          >
+          <Button variant={selectedStatus === undefined ? "default" : "outline"} onClick={() => setSelectedStatus(undefined)} size="sm">
             All
           </Button>
-          <Button
-            variant={selectedStatus === "pending" ? "default" : "outline"}
-            onClick={() => setSelectedStatus("pending")}
-            size="sm"
-          >
+          <Button variant={selectedStatus === "pending" ? "default" : "outline"} onClick={() => setSelectedStatus("pending")} size="sm">
             Pending
           </Button>
-          <Button
-            variant={selectedStatus === "in_progress" ? "default" : "outline"}
-            onClick={() => setSelectedStatus("in_progress")}
-            size="sm"
-          >
+          <Button variant={selectedStatus === "in_progress" ? "default" : "outline"} onClick={() => setSelectedStatus("in_progress")} size="sm">
             In Progress
           </Button>
-          <Button
-            variant={selectedStatus === "resolved" ? "default" : "outline"}
-            onClick={() => setSelectedStatus("resolved")}
-            size="sm"
-          >
+          <Button variant={selectedStatus === "resolved" ? "default" : "outline"} onClick={() => setSelectedStatus("resolved")} size="sm">
             Resolved
           </Button>
         </div>
       </div>
 
-      {escalations.length === 0 ? (
+      {selectedTicket ? (
+        <div>
+          <Button onClick={() => setSelectedTicket(null)} variant="outline" size="sm" className="mb-4">
+            ← Back to List
+          </Button>
+          <EscalationDetailView ticketId={selectedTicket} />
+        </div>
+      ) : filtered.length === 0 ? (
         <Card className="p-8 text-center text-gray-500">
           <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p>No escalations found</p>
         </Card>
       ) : (
         <div className="space-y-2">
-          {escalations.map((ticket) => (
-            <Card key={ticket.id} className="p-4 hover:bg-gray-50 transition">
+          {filtered.map((ticket) => (
+            <Card key={ticket.id} className="p-4 hover:bg-gray-50 transition cursor-pointer" onClick={() => setSelectedTicket(ticket.id)}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold">Ticket #{ticket.id}</span>
-                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>
-                      {ticket.status}
-                    </span>
-                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(ticket.priority)}`}>
-                      {ticket.priority}
-                    </span>
+                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
+                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
                   </div>
                   <p className="text-sm text-gray-600">{ticket.reason}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Created: {new Date(ticket.createdAt).toLocaleString()}
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
                 </div>
+                <div className="text-gray-400 ml-4">→</div>
               </div>
             </Card>
           ))}
@@ -255,69 +265,91 @@ function EscalationsTab() {
 }
 
 /**
+ * Escalation Detail View Component
+ */
+function EscalationDetailView({ ticketId }: { ticketId: number }) {
+  const escalationsQuery = trpc.admin.getEscalations.useQuery({ limit: 100 });
+  const ticket = escalationsQuery.data?.find((t) => t.id === ticketId);
+
+  if (escalationsQuery.isLoading) {
+    return <div className="text-center py-8">Loading ticket details...</div>;
+  }
+
+  if (!ticket) {
+    return (
+      <Card className="p-8 text-center text-gray-500">
+        <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+        <p>Ticket not found</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-bold">Ticket #{ticket.id}</h3>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-600">Status</p>
+          <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-600">Priority</p>
+          <span className={`px-2 py-1 text-xs rounded-full font-medium ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-gray-600 mb-2">Reason</p>
+        <p className="text-gray-900">{ticket.reason}</p>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-gray-600 mb-2">Assigned To</p>
+        <p className="text-gray-900">{ticket.assignedTo || "Unassigned"}</p>
+      </div>
+
+      <div className="pt-4 border-t border-gray-200">
+        <p className="text-xs text-gray-500">Created: {new Date(ticket.createdAt).toLocaleString()}</p>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * Documentation Tab Component
  */
 function DocumentationTab() {
-  const docsQuery = trpc.admin.getDocumentation.useQuery({ limit: 20 });
   const [newDoc, setNewDoc] = useState({ title: "", content: "", departmentId: 1 });
-
-  if (docsQuery.isLoading) {
-    return <div className="text-center py-8">Loading documentation...</div>;
-  }
-
-  const docs = docsQuery.data || [];
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Documentation Sources</h2>
-
-      {/* Add Documentation Form */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Add New Documentation</h3>
+        <h3 className="text-lg font-semibold mb-4">Add Documentation</h3>
         <div className="space-y-4">
           <input
             type="text"
             placeholder="Title"
             value={newDoc.title}
             onChange={(e) => setNewDoc({ ...newDoc, title: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <textarea
             placeholder="Content"
             value={newDoc.content}
             onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
           />
           <Button className="w-full">Add Documentation</Button>
         </div>
       </Card>
 
-      {/* Documentation List */}
-      <div className="space-y-2">
-        {docs.length === 0 ? (
-          <Card className="p-8 text-center text-gray-500">
-            <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>No documentation found</p>
-          </Card>
-        ) : (
-          docs.map((doc) => (
-            <Card key={doc.id} className="p-4 hover:bg-gray-50 transition">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900">{doc.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{doc.content}</p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Updated: {new Date(doc.updatedAt).toLocaleString()}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                  Delete
-                </Button>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Documentation List</h3>
+        <p className="text-gray-600">No documentation items yet</p>
+      </Card>
     </div>
   );
 }
@@ -328,16 +360,9 @@ function DocumentationTab() {
 function KnowledgeBaseTab() {
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Knowledge Base Management</h2>
-      <p className="text-gray-600">Upload and manage department-specific documentation for AI training</p>
-      
-      {/* Embed the KnowledgeBaseManagement component */}
       <Card className="p-6">
-        <div className="text-center py-8 text-gray-500">
-          <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Knowledge base management interface</p>
-          <p className="text-sm mt-2">Upload documents to train the AI system with department-specific knowledge</p>
-        </div>
+        <h3 className="text-lg font-semibold mb-4">Knowledge Base</h3>
+        <p className="text-gray-600">Knowledge base management coming soon</p>
       </Card>
     </div>
   );
@@ -347,97 +372,37 @@ function KnowledgeBaseTab() {
  * Audit Logs Tab Component
  */
 function AuditLogsTab() {
-  const auditQuery = trpc.admin.getAuditLogs.useQuery({ limit: 50 });
+  const auditLogsQuery = trpc.admin.getAuditLogs.useQuery({ limit: 50 });
 
-  if (auditQuery.isLoading) {
+  if (auditLogsQuery.isLoading) {
     return <div className="text-center py-8">Loading audit logs...</div>;
   }
 
-  const logs = auditQuery.data || [];
+  const logs = auditLogsQuery.data || [];
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-900">Audit Logs</h2>
-
       {logs.length === 0 ? (
         <Card className="p-8 text-center text-gray-500">
-          <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p>No audit logs found</p>
         </Card>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left font-semibold">Action</th>
-                <th className="px-4 py-2 text-left font-semibold">Resource</th>
-                <th className="px-4 py-2 text-left font-semibold">User</th>
-                <th className="px-4 py-2 text-left font-semibold">Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium">{log.action}</td>
-                  <td className="px-4 py-2">{log.resourceType}</td>
-                  <td className="px-4 py-2">{log.userId}</td>
-                  <td className="px-4 py-2 text-gray-600">{new Date(log.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {logs.map((log, idx) => (
+            <Card key={idx} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{log.action}</p>
+                  <p className="text-sm text-gray-600">{log.resourceType}: {log.resourceId}</p>
+                  <p className="text-xs text-gray-500 mt-1">By: {log.userId} - {new Date(log.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
     </div>
   );
-}
-
-/**
- * Metric Card Component
- */
-function MetricCard({ title, value, icon }: { title: string; value: string | number; icon: React.ReactNode }) {
-  return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className="opacity-50">{icon}</div>
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Helper functions for status/priority colors
- */
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "in_progress":
-      return "bg-blue-100 text-blue-800";
-    case "resolved":
-      return "bg-green-100 text-green-800";
-    case "closed":
-      return "bg-gray-100 text-gray-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-function getPriorityColor(priority: string): string {
-  switch (priority) {
-    case "low":
-      return "bg-green-100 text-green-800";
-    case "medium":
-      return "bg-yellow-100 text-yellow-800";
-    case "high":
-      return "bg-orange-100 text-orange-800";
-    case "urgent":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
 }

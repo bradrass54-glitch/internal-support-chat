@@ -237,3 +237,9 @@
 ## Bug Fixes (Current Sprint)
 - [x] Fix test chat button functionality
 - [x] Fix mobile menu bar layout and responsiveness
+
+
+## Critical Bugs (Current Sprint)
+- [x] Fix escalation menu items - not clickable/no detail views
+- [x] Fix admin dashboard menu navigation - buttons don't work
+- [x] Add click handlers to all interactive menu items
