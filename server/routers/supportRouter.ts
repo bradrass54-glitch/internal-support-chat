@@ -2,6 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as supportService from "../services/supportService";
 import * as aiService from "../services/aiService";
+import * as aiStreamingService from "../services/aiStreamingService";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { alerts } from "../../drizzle/schema";
@@ -113,142 +114,104 @@ export const supportRouter = router({
     }),
 
   /**
-   * Get all messages in the conversation
+   * Send a message and stream AI response in real-time
    */
-  getMessages: protectedProcedure
+  sendMessageStreaming: protectedProcedure
     .input(
       z.object({
+        content: z.string().min(1).max(5000),
         conversationId: z.number().int().positive(),
-        limit: z.number().int().min(1).max(100).default(50),
-        offset: z.number().int().min(0).default(0),
-      })
-    )
-    .query(async ({ input, ctx }) => {
-      try {
-        // Verify user owns the conversation
-        const conversation = await supportService.getConversation(input.conversationId, ctx.user.id);
-        if (!conversation) {
-          throw new Error("Conversation not found or access denied");
-        }
-
-        const msgs = await supportService.getConversationMessages(
-          input.conversationId,
-          input.limit,
-          input.offset
-        );
-
-        return msgs;
-      } catch (error) {
-        console.error("[Support] Failed to get messages:", error);
-        return [];
-      }
-    }),
-
-  /**
-   * Get active alerts for the user
-   * Shows known issues and solutions
-   */
-  getAlerts: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().int().min(1).max(50).default(10),
-      })
-    )
-    .query(async () => {
-      try {
-        const db = await getDb();
-        if (!db) return [];
-
-        // Get active alerts (not expired)
-        const alertList = await db
-          .select()
-          .from(alerts)
-          .where(eq(alerts.isActive, true))
-          .limit(10);
-
-        return alertList;
-      } catch (error) {
-        console.error("[Support] Failed to get alerts:", error);
-        return [];
-      }
-    }),
-
-  /**
-   * Request escalation to live agent
-   */
-  escalateConversation: protectedProcedure
-    .input(
-      z.object({
-        conversationId: z.number().int().positive(),
-        reason: z.string().min(1).max(500),
-        priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        // Verify user owns the conversation
-        const conversation = await supportService.getConversation(input.conversationId, ctx.user.id);
-        if (!conversation) {
-          throw new Error("Conversation not found or access denied");
-        }
-
-        // Add escalation request message
-        await supportService.addMessage(
+        // Add user message to conversation
+        const userMessage = await supportService.addMessage(
           input.conversationId,
           ctx.user.id,
-          `Escalation requested: ${input.reason}`,
-          "system",
+          input.content,
+          "user",
           false,
           undefined,
           ctx.req.ip,
           ctx.req.get("user-agent")
         );
 
-        // Create escalation ticket
-        const escalation = await supportService.escalateConversation(
-          ctx.workspace?.id || 1,
+        if (!userMessage) {
+          throw new Error("Failed to save user message");
+        }
+
+        // Detect department from message
+        const detectedDept = await aiService.detectDepartment(input.content);
+
+        // Generate AI response with streaming
+        let fullResponse = "";
+        await aiStreamingService.generateAIResponseStreaming(
+          input.conversationId,
+          input.content,
+          async (chunk: string) => {
+            fullResponse += chunk;
+          }
+        );
+
+        // Save AI response to conversation
+        const assistantMessage = await supportService.addMessage(
           input.conversationId,
           ctx.user.id,
-          input.reason,
-          input.priority,
-          ctx.user.id,
+          fullResponse,
+          "system",
+          true,
+          undefined,
           ctx.req.ip,
           ctx.req.get("user-agent")
         );
 
-        return escalation;
+        // Record learning feedback data
+        if (assistantMessage) {
+          await supportService.recordLearningFeedback(
+            assistantMessage.id,
+            ctx.user.id,
+            "partially_helpful",
+            0,
+            detectedDept ? `Detected department: ${detectedDept}` : undefined,
+            ctx.req.ip,
+            ctx.req.get("user-agent")
+          );
+        }
+
+        return {
+          userMessage,
+          assistantMessage,
+          detectedDepartment: detectedDept,
+        };
       } catch (error) {
-        console.error("[Support] Failed to escalate:", error);
+        console.error("[Support] Failed to send streaming message:", error);
         throw error;
       }
     }),
 
   /**
-   * Rate AI response (for learning)
+   * Get messages for a conversation
    */
-  rateResponse: protectedProcedure
+  getMessages: protectedProcedure
     .input(
       z.object({
-        messageId: z.number().int().positive(),
-        rating: z.number().int().min(1).max(5),
-        feedback: z.string().max(500).optional(),
+        conversationId: z.number().int().positive(),
+        limit: z.number().int().positive().default(50),
+        offset: z.number().int().nonnegative().default(0),
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .query(async ({ input, ctx }) => {
       try {
-        const feedback = await supportService.recordLearningFeedback(
-          input.messageId,
-          ctx.user.id,
-          input.rating >= 4 ? "helpful" : "not_helpful",
-          input.rating,
-          input.feedback,
-          ctx.req.ip,
-          ctx.req.get("user-agent")
-        );
+        // Verify user has access to this conversation
+        const conversation = await supportService.getConversation(input.conversationId, ctx.user.id);
+        if (!conversation) {
+          throw new Error("Conversation not found or access denied");
+        }
 
-        return feedback;
+        return await supportService.getConversationMessages(input.conversationId, input.limit, input.offset);
       } catch (error) {
-        console.error("[Support] Failed to rate response:", error);
+        console.error("[Support] Failed to get messages:", error);
         throw error;
       }
     }),
@@ -259,22 +222,81 @@ export const supportRouter = router({
   getConversationHistory: protectedProcedure
     .input(
       z.object({
-        limit: z.number().int().min(1).max(50).default(10),
-        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().positive().default(50),
+        offset: z.number().int().nonnegative().default(0),
       })
     )
     .query(async ({ input, ctx }) => {
       try {
-        const convs = await supportService.getUserConversations(
-          ctx.user.id,
-          input.limit,
-          input.offset
-        );
-
-        return convs;
+        return await supportService.getUserConversations(ctx.user.id, input.limit, input.offset);
       } catch (error) {
         console.error("[Support] Failed to get conversation history:", error);
-        return [];
+        throw error;
+      }
+    }),
+
+  /**
+   * Escalate a conversation to a live agent
+   */
+  escalateConversation: protectedProcedure
+    .input(
+      z.object({
+        conversationId: z.number().int().positive(),
+        reason: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Verify user owns the conversation
+        const conversation = await supportService.getConversation(input.conversationId, ctx.user.id);
+        if (!conversation) {
+          throw new Error("Conversation not found or access denied");
+        }
+
+        // Create escalation ticket
+        const escalation = await supportService.escalateConversation(
+          ctx.workspace?.id || 1,
+          input.conversationId,
+          ctx.user.id,
+          input.reason || "User requested escalation",
+          "high",
+          ctx.user.id,
+          ctx.req.ip,
+          ctx.req.get("user-agent")
+        );
+
+        return escalation;
+      } catch (error) {
+        console.error("[Support] Failed to escalate conversation:", error);
+        throw error;
+      }
+    }),
+
+  /**
+   * Submit feedback on AI response
+   */
+  submitFeedback: protectedProcedure
+    .input(
+      z.object({
+        messageId: z.number().int().positive(),
+        rating: z.number().int().min(1).max(5),
+        comment: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await supportService.recordLearningFeedback(
+          input.messageId,
+          ctx.user.id,
+          input.rating >= 4 ? "helpful" : input.rating >= 3 ? "partially_helpful" : "not_helpful",
+          input.rating,
+          input.comment,
+          ctx.req.ip,
+          ctx.req.get("user-agent")
+        );
+      } catch (error) {
+        console.error("[Support] Failed to submit feedback:", error);
+        throw error;
       }
     }),
 
@@ -294,9 +316,7 @@ export const supportRouter = router({
         if (!conversation) {
           throw new Error("Conversation not found or access denied");
         }
-
         await supportService.closeConversation(input.conversationId, ctx.user.id);
-
         return { success: true };
       } catch (error) {
         console.error("[Support] Failed to close conversation:", error);

@@ -50,6 +50,7 @@ export default function Home() {
   });
 
   const sendMessageMutation = trpc.support.sendMessage.useMutation();
+  const sendMessageStreamingMutation = trpc.support.sendMessageStreaming.useMutation();
   const getMessagesQuery = trpc.support.getMessages.useQuery(
     { conversationId: conversationId || 0, limit: 50 },
     { enabled: !!conversationId && isAuthenticated }
@@ -132,7 +133,7 @@ export default function Home() {
     setInputValue("");
 
     try {
-      const result = await sendMessageMutation.mutateAsync({
+      const result = await sendMessageStreamingMutation.mutateAsync({
         content: userMessage,
         conversationId,
       });
