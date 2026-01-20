@@ -232,3 +232,8 @@
 - [ ] SMS support channel
 - [ ] Webhook support for external integrations
 - [ ] System health monitoring dashboard
+
+
+## Bug Fixes (Current Sprint)
+- [x] Fix test chat button functionality
+- [x] Fix mobile menu bar layout and responsiveness

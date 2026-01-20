@@ -1,12 +1,13 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, LogOut, Loader2, Menu, X, Plus, MessageSquare, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 import { AgentChat } from "@/components/AgentChat";
 import { SetupWizard } from "@/components/SetupWizard";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLocation } from "wouter";
 
 interface Message {
   id: number;
@@ -25,6 +26,7 @@ interface Conversation {
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
+  const [, navigate] = useLocation();
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -334,20 +336,33 @@ export default function Home() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+        <div className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
             {isMobile && (
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
               >
-                <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-700" />
+                <Menu className="w-5 h-5 text-gray-700" />
               </button>
             )}
             <div className="min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Support Chat</h1>
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900 truncate">Support Chat</h1>
               <p className="text-xs md:text-sm text-gray-600 hidden sm:block">AI-powered assistance for IT, HR, and Finance</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {user?.role === "admin" && (
+              <Button onClick={() => navigate("/admin")} variant="outline" size="sm" className="text-xs md:text-sm">
+                Admin
+              </Button>
+            )}
+            <Button onClick={() => navigate("/profile")} variant="outline" size="sm" className="text-xs md:text-sm">
+              Profile
+            </Button>
+            <Button onClick={logout} variant="outline" size="sm" className="text-xs md:text-sm">
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
