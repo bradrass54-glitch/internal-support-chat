@@ -9,15 +9,15 @@
     "deploymentEnabled": true
   },
   "functions": {
-    "api/index.ts": {
+    "dist/index.js": {
       "memory": 1024,
       "maxDuration": 60
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api"
+      "src": "/(.*)",
+      "dest": "dist/index.js"
     }
   ]
 }
