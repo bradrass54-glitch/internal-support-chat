@@ -2,7 +2,7 @@
   "buildCommand": "pnpm install && pnpm build",
   "devCommand": "pnpm dev",
   "installCommand": "pnpm install --frozen-lockfile",
-  "framework": "vite",
+  "framework": null,
   "outputDirectory": "dist",
   "regions": ["iad1"],
   "git": {
