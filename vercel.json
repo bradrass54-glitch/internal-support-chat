@@ -7,5 +7,21 @@
   "regions": ["iad1"],
   "git": {
     "deploymentEnabled": true
-  }
+  },
+  "functions": {
+    "api/handler.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/public/(.*)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/handler.js"
+    }
+  ]
 }
