@@ -4,23 +4,6 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": "vite",
   "outputDirectory": "dist",
-  "env": {
-    "DATABASE_URL": "@database-url",
-    "JWT_SECRET": "@jwt-secret",
-    "VITE_APP_ID": "@vite-app-id",
-    "OAUTH_SERVER_URL": "@oauth-server-url",
-    "VITE_OAUTH_PORTAL_URL": "@vite-oauth-portal-url",
-    "OWNER_OPEN_ID": "@owner-open-id",
-    "OWNER_NAME": "@owner-name",
-    "BUILT_IN_FORGE_API_URL": "@built-in-forge-api-url",
-    "BUILT_IN_FORGE_API_KEY": "@built-in-forge-api-key",
-    "VITE_FRONTEND_FORGE_API_KEY": "@vite-frontend-forge-api-key",
-    "VITE_FRONTEND_FORGE_API_URL": "@vite-frontend-forge-api-url",
-    "VITE_ANALYTICS_ENDPOINT": "@vite-analytics-endpoint",
-    "VITE_ANALYTICS_WEBSITE_ID": "@vite-analytics-website-id",
-    "VITE_APP_TITLE": "@vite-app-title",
-    "VITE_APP_LOGO": "@vite-app-logo"
-  },
   "regions": ["iad1"],
   "git": {
     "deploymentEnabled": true
